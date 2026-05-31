@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>DOI XML Repair</title>
+    <link rel="stylesheet" href="assets/styles.css" />
+  </head>
+  <body>
+    <header class="app-header">
+      <div>
+        <p class="eyebrow">Crossref XML Utility</p>
+        <h1>DOI XML Repair</h1>
+        <p class="lead">
+          Metadata mengikuti XML baru. DOI artikel tetap persis dari XML lama,
+          termasuk prefix dan suffix. Timestamp output dinaikkan untuk update
+          Crossref.
+        </p>
+      </div>
+      <div class="runtime" id="runtimeStatus">Memuat Python...</div>
+    </header>
+
+    <main class="workspace">
+      <section class="upload-grid" aria-label="Upload XML">
+        <div class="upload-panel">
+          <div class="panel-heading">
+            <span class="step">1</span>
+            <div>
+              <h2>XML Lama</h2>
+              <p>Sumber DOI artikel yang akan dikunci.</p>
+            </div>
+          </div>
+          <label class="file-drop" for="oldXmlInput">
+            <i data-lucide="file-up"></i>
+            <span id="oldFileName">Pilih file XML lama</span>
+            <input id="oldXmlInput" type="file" accept=".xml,text/xml,application/xml" disabled />
+          </label>
+          <div id="oldSummary" class="summary muted">Belum ada file.</div>
+        </div>
+
+        <div class="upload-panel">
+          <div class="panel-heading">
+            <span class="step">2</span>
+            <div>
+              <h2>XML Baru</h2>
+              <p>Sumber metadata baru untuk output.</p>
+            </div>
+          </div>
+          <label class="file-drop" for="newXmlInput">
+            <i data-lucide="file-up"></i>
+            <span id="newFileName">Pilih file XML baru</span>
+            <input id="newXmlInput" type="file" accept=".xml,text/xml,application/xml" disabled />
+          </label>
+          <div id="newSummary" class="summary muted">Belum ada file.</div>
+        </div>
+      </section>
+
+      <section class="mapping-section" aria-label="Pemetaan DOI">
+        <div class="section-title">
+          <div>
+            <p class="eyebrow">Pemetaan DOI</p>
+            <h2>Artikel baru memakai DOI lama</h2>
+          </div>
+          <button class="button secondary" id="resetButton" type="button">
+            <i data-lucide="rotate-ccw"></i>
+            Reset
+          </button>
+        </div>
+        <div id="mappingStatus" class="notice">
+          Upload kedua XML untuk membuat XML akhir.
+        </div>
+        <div class="table-wrap">
+          <table id="mappingTable" class="mapping-table" hidden>
+            <thead>
+              <tr>
+                <th>Artikel baru</th>
+                <th>DOI lama yang dipertahankan</th>
+              </tr>
+            </thead>
+            <tbody id="mappingBody"></tbody>
+          </table>
+        </div>
+        <div class="action-row">
+          <button class="button primary" id="generateButton" type="button" disabled>
+            <i data-lucide="wand-sparkles"></i>
+            Generate Ulang
+          </button>
+        </div>
+      </section>
+
+      <section class="output-section" aria-label="Output XML">
+        <div class="section-title">
+          <div>
+            <p class="eyebrow">Output</p>
+            <h2>XML hasil perbaikan</h2>
+          </div>
+          <div class="save-actions">
+            <button class="button secondary" id="copyButton" type="button" disabled>
+              <i data-lucide="copy"></i>
+              Copy
+            </button>
+            <button class="button secondary" id="downloadButton" type="button" disabled>
+              <i data-lucide="download"></i>
+              Download
+            </button>
+          </div>
+        </div>
+        <div id="outputInfo" class="notice">
+          Output akan dibuat otomatis setelah kedua XML diupload.
+        </div>
+        <textarea id="xmlOutput" spellcheck="false" readonly></textarea>
+      </section>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"></script>
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+    <script src="assets/app.js"></script>
+  </body>
+</html>
