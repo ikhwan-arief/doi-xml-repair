@@ -16,6 +16,7 @@ const state = {
   oldDoiText: "",
   oldDoiArticles: [],
   newText: "",
+  newUrlText: "",
   oldAnalysis: null,
   newAnalysis: null,
   outputXml: "",
@@ -28,6 +29,7 @@ const els = {
   oldDoiInput: document.querySelector("#oldDoiInput"),
   lookupDoiButton: document.querySelector("#lookupDoiButton"),
   newXmlInput: document.querySelector("#newXmlInput"),
+  newUrlInput: document.querySelector("#newUrlInput"),
   oldFileName: document.querySelector("#oldFileName"),
   newFileName: document.querySelector("#newFileName"),
   oldSummary: document.querySelector("#oldSummary"),
@@ -38,6 +40,7 @@ const els = {
   generateButton: document.querySelector("#generateButton"),
   resetButton: document.querySelector("#resetButton"),
   outputInfo: document.querySelector("#outputInfo"),
+  outputResourceSummary: document.querySelector("#outputResourceSummary"),
   xmlOutput: document.querySelector("#xmlOutput"),
   copyButton: document.querySelector("#copyButton"),
   downloadButton: document.querySelector("#downloadButton"),
@@ -59,6 +62,7 @@ function bindEvents() {
   els.oldDoiInput.addEventListener("input", handleDoiTextInput);
   els.lookupDoiButton.addEventListener("click", lookupOldDois);
   els.newXmlInput.addEventListener("change", () => handleFileChange("new"));
+  els.newUrlInput.addEventListener("input", handleNewUrlInput);
   els.generateButton.addEventListener("click", generateXml);
   els.resetButton.addEventListener("click", resetApp);
   els.copyButton.addEventListener("click", copyOutput);
@@ -80,6 +84,7 @@ async function bootPython() {
     els.oldXmlInput.disabled = false;
     els.oldDoiInput.disabled = false;
     els.newXmlInput.disabled = false;
+    els.newUrlInput.disabled = false;
     setOldMode("xml");
   } catch (error) {
     setNotice(
@@ -130,6 +135,12 @@ function handleDoiTextInput() {
   clearOutput();
   els.lookupDoiButton.disabled = parseDoiLines(state.oldDoiText).length === 0;
   renderDoiSummary();
+  renderMapping();
+}
+
+function handleNewUrlInput() {
+  state.newUrlText = els.newUrlInput.value;
+  clearOutput();
   renderMapping();
 }
 
@@ -395,11 +406,15 @@ function renderMapping() {
   }
 
   const warnings = [];
+  const urlValidation = validateNewArticleUrls();
   if (oldArticles.length !== newArticles.length) {
     const oldLabel = state.oldMode === "doi" ? "DOI lama" : "XML lama";
     warnings.push(
       `Jumlah artikel berbeda: ${oldLabel} ${oldArticles.length}, XML baru ${newArticles.length}.`,
     );
+  }
+  if (!urlValidation.valid) {
+    warnings.push(urlValidation.message);
   }
 
   newArticles.forEach((newArticle, index) => {
@@ -408,12 +423,15 @@ function renderMapping() {
     const selectCell = document.createElement("td");
     const title = document.createElement("span");
     const doi = document.createElement("div");
+    const resource = document.createElement("div");
     const select = document.createElement("select");
 
     title.className = "article-title";
     title.textContent = `${newArticle.number}. ${newArticle.title}`;
     doi.className = "doi-code";
     doi.textContent = `DOI pada XML baru: ${newArticle.doi}`;
+    resource.className = "doi-code";
+    resource.textContent = articleResourceLabel(newArticle, urlValidation.urls[index]);
 
     select.dataset.newIndex = String(index);
     select.appendChild(new Option("Pilih DOI lama", ""));
@@ -435,6 +453,7 @@ function renderMapping() {
 
     titleCell.appendChild(title);
     titleCell.appendChild(doi);
+    titleCell.appendChild(resource);
     selectCell.appendChild(select);
     tr.appendChild(titleCell);
     tr.appendChild(selectCell);
@@ -464,6 +483,7 @@ function renderMapping() {
 function validateMapping() {
   const selects = [...els.mappingBody.querySelectorAll("select")];
   const selected = selects.map((select) => select.value).filter(Boolean);
+  const urlValidation = validateNewArticleUrls();
   const duplicateValues = selected.filter(
     (value, index) => selected.indexOf(value) !== index,
   );
@@ -491,6 +511,8 @@ function validateMapping() {
       "Semua artikel baru harus dipasangkan dengan DOI lama.",
       "warn",
     );
+  } else if (!urlValidation.valid && currentOldArticles().length && state.newAnalysis) {
+    setNotice(els.mappingStatus, urlValidation.message, "error");
   } else if (currentOldArticles().length && state.newAnalysis) {
     const oldCount = currentOldArticles().length;
     const newCount = state.newAnalysis.articles.length;
@@ -507,8 +529,8 @@ function validateMapping() {
     setNotice(els.mappingStatus, message, type);
   }
 
-  els.generateButton.disabled = !complete || hasDuplicate;
-  return complete && !hasDuplicate;
+  els.generateButton.disabled = !complete || hasDuplicate || !urlValidation.valid;
+  return complete && !hasDuplicate && urlValidation.valid;
 }
 
 function collectMapping() {
@@ -522,6 +544,7 @@ function generateXml(options = {}) {
   clearOutput();
   try {
     const mappingJson = JSON.stringify(collectMapping());
+    const newResourceUrlsJson = JSON.stringify(validateNewArticleUrls().urls);
     const result =
       state.oldMode === "doi"
         ? JSON.parse(
@@ -529,22 +552,34 @@ function generateXml(options = {}) {
               JSON.stringify(currentOldArticles().map((article) => article.doi)),
               state.newText,
               mappingJson,
+              newResourceUrlsJson,
             ),
           )
-        : JSON.parse(state.repairXml(state.oldText, state.newText, mappingJson));
+        : JSON.parse(
+            state.repairXml(
+              state.oldText,
+              state.newText,
+              mappingJson,
+              newResourceUrlsJson,
+            ),
+          );
     state.outputXml = result.xml;
     els.xmlOutput.value = result.xml;
     els.copyButton.disabled = false;
     els.downloadButton.disabled = false;
+    renderOutputResourceSummary(result.mapping || []);
     const warningText = result.warnings && result.warnings.length
       ? ` ${result.warnings.join(" ")}`
       : "";
     const prefix = options.auto
       ? "XML akhir dibuat otomatis."
       : "XML berhasil dibuat.";
+    const resourceText = result.resource_url_override_count
+      ? ` ${result.resource_url_override_count} URL artikel baru dipakai untuk doi_data/resource.`
+      : "";
     setNotice(
       els.outputInfo,
-      `${prefix} ${result.article_count} artikel memakai DOI lama. Timestamp dinaikkan untuk update Crossref: ${result.timestamp}.${warningText}`,
+      `${prefix} ${result.article_count} artikel memakai DOI lama. Timestamp dinaikkan untuk update Crossref: ${result.timestamp}.${resourceText}${warningText}`,
       result.warnings && result.warnings.length ? "warn" : "success",
     );
   } catch (error) {
@@ -590,6 +625,7 @@ function resetApp() {
   state.oldDoiText = "";
   state.oldDoiArticles = [];
   state.newText = "";
+  state.newUrlText = "";
   state.oldAnalysis = null;
   state.newAnalysis = null;
   state.outputXml = "";
@@ -597,6 +633,7 @@ function resetApp() {
   els.oldDoiInput.value = "";
   els.lookupDoiButton.disabled = true;
   els.newXmlInput.value = "";
+  els.newUrlInput.value = "";
   els.oldFileName.textContent = "Pilih file XML lama";
   els.newFileName.textContent = "Pilih file XML baru";
   els.oldSummary.className = "summary muted";
@@ -611,6 +648,8 @@ function clearOutput() {
   els.xmlOutput.value = "";
   els.copyButton.disabled = true;
   els.downloadButton.disabled = true;
+  els.outputResourceSummary.hidden = true;
+  els.outputResourceSummary.innerHTML = "";
   setNotice(
     els.outputInfo,
     "Output akan dibuat otomatis setelah data lama dan XML baru siap.",
@@ -627,6 +666,7 @@ function formatMeta(article) {
   const parts = [];
   if (article.year) parts.push(`Tahun ${article.year}`);
   if (article.first_page) parts.push(`Hal. ${article.first_page}`);
+  if (article.resource_url) parts.push(`URL: ${article.resource_url}`);
   return parts.join(" - ") || "Metadata ringkas tidak tersedia";
 }
 
@@ -638,6 +678,69 @@ function formatCrossrefMeta(article) {
   if (article.issue) parts.push(`No. ${article.issue}`);
   if (article.first_page) parts.push(`Hal. ${article.first_page}`);
   return parts.join(" - ") || "Metadata Crossref ringkas tidak tersedia";
+}
+
+function renderOutputResourceSummary(mapping) {
+  if (!mapping.length) {
+    els.outputResourceSummary.hidden = true;
+    els.outputResourceSummary.innerHTML = "";
+    return;
+  }
+  els.outputResourceSummary.hidden = false;
+  els.outputResourceSummary.innerHTML = `
+    <h3>DOI dan URL artikel yang dipakai</h3>
+    <ul>
+      ${mapping
+        .map(
+          (item) => `
+            <li>
+              <span class="doi-code">${escapeHtml(item.doi)}</span>
+              <span>${safeExternalLink(item.resource_url || "") || "URL artikel kosong"}</span>
+            </li>
+          `,
+        )
+        .join("")}
+    </ul>
+  `;
+}
+
+function articleResourceLabel(article, overrideUrl) {
+  if (overrideUrl) {
+    return `URL output dari input: ${overrideUrl}`;
+  }
+  if (article.resource_url) {
+    return `URL output dari XML baru: ${article.resource_url}`;
+  }
+  return "URL output belum tersedia di XML baru.";
+}
+
+function validateNewArticleUrls() {
+  const urls = parseArticleUrlLines(state.newUrlText);
+  if (!state.newAnalysis || !urls.length) {
+    return { valid: true, urls, message: "" };
+  }
+  const expectedCount = state.newAnalysis.article_count;
+  if (urls.length !== expectedCount) {
+    return {
+      valid: false,
+      urls,
+      message: `Jumlah URL artikel baru harus sama dengan jumlah artikel XML baru: ${urls.length} URL untuk ${expectedCount} artikel.`,
+    };
+  }
+
+  const invalidLines = urls
+    .map((url, index) => ({ url, index }))
+    .filter((item) => !/^https?:\/\//i.test(item.url))
+    .map((item) => item.index + 1);
+  if (invalidLines.length) {
+    return {
+      valid: false,
+      urls,
+      message: `URL artikel baru harus diawali http:// atau https://. Baris: ${invalidLines.join(", ")}.`,
+    };
+  }
+
+  return { valid: true, urls, message: "" };
 }
 
 function renderCrossrefDetails(article) {
@@ -798,6 +901,13 @@ function parseDoiLines(value) {
   return String(value || "")
     .split(/\r?\n/)
     .map((line) => normalizeDoi(line))
+    .filter(Boolean);
+}
+
+function parseArticleUrlLines(value) {
+  return String(value || "")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
     .filter(Boolean);
 }
 

@@ -34,6 +34,21 @@ def _article_dois(xml_text):
     return dois
 
 
+def _article_resources(xml_text):
+    root = ET.fromstring(xml_text)
+    resources = []
+    for article in root.iter():
+        if _local(article.tag) != "journal_article":
+            continue
+        for child in list(article):
+            if _local(child.tag) != "doi_data":
+                continue
+            for grandchild in list(child):
+                if _local(grandchild.tag) == "resource":
+                    resources.append((grandchild.text or "").strip())
+    return resources
+
+
 def _article_titles(xml_text):
     root = ET.fromstring(xml_text)
     titles = []
@@ -215,6 +230,74 @@ def test_repair_from_old_doi_list():
     assert _article_dois(result["xml"]) == ["10.5555/ABC.Old-1"]
     assert "New corrected title" in _article_titles(result["xml"])
     assert int(_timestamp(result["xml"])) > 20240102000000
+
+
+def test_repair_can_override_new_article_resource_urls():
+    result = repair_xml(
+        OLD_ISSUE,
+        NEW_ISSUE,
+        [
+            {"new_index": 0, "old_index": 1},
+            {"new_index": 1, "old_index": 0},
+        ],
+        resource_urls=[
+            "https://journal.example.org/new-first",
+            "https://journal.example.org/new-second",
+        ],
+    )
+
+    assert _article_dois(result["xml"]) == ["10.7777/Locked.B", "10.7777/LOCKED-A"]
+    assert _article_resources(result["xml"]) == [
+        "https://journal.example.org/new-first",
+        "https://journal.example.org/new-second",
+    ]
+    assert result["resource_url_override_count"] == 2
+    assert result["mapping"][0]["doi"] == "10.7777/Locked.B"
+    assert result["mapping"][0]["resource_url"] == "https://journal.example.org/new-first"
+    assert result["mapping"][1]["doi"] == "10.7777/LOCKED-A"
+    assert result["mapping"][1]["resource_url"] == "https://journal.example.org/new-second"
+
+
+def test_repair_creates_missing_resource_from_supplied_url():
+    new_without_resource = re.sub(
+        r"<resource>.*?</resource>",
+        "",
+        NEW_SINGLE,
+        flags=re.S,
+    )
+
+    result = repair_xml(
+        OLD_SINGLE,
+        new_without_resource,
+        [{"new_index": 0, "old_index": 0}],
+        resource_urls=["https://journal.example.org/article"],
+    )
+
+    assert _article_resources(result["xml"]) == ["https://journal.example.org/article"]
+    assert result["mapping"][0]["resource_url"] == "https://journal.example.org/article"
+
+
+def test_rejects_mismatched_new_resource_url_count():
+    with pytest.raises(XmlRepairError, match="Jumlah URL artikel baru"):
+        repair_xml(
+            OLD_SINGLE,
+            NEW_SINGLE,
+            [{"new_index": 0, "old_index": 0}],
+            resource_urls=[
+                "https://journal.example.org/article-1",
+                "https://journal.example.org/article-2",
+            ],
+        )
+
+
+def test_rejects_invalid_new_resource_url():
+    with pytest.raises(XmlRepairError, match="harus diawali"):
+        repair_xml(
+            OLD_SINGLE,
+            NEW_SINGLE,
+            [{"new_index": 0, "old_index": 0}],
+            resource_urls=["ftp://journal.example.org/article"],
+        )
 
 
 def test_rejects_duplicate_old_doi_list():

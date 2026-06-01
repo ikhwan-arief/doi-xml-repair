@@ -10,6 +10,8 @@ cipta.
 Aplikasi statis untuk GitHub Pages yang memperbaiki XML Crossref dengan
 mengunci DOI artikel lama secara penuh. Metadata diambil dari XML baru, tetapi
 nilai `journal_article/doi_data/doi` pada output disalin dari XML lama.
+URL website artikel baru dapat ditulis manual dan akan dipakai untuk
+`journal_article/doi_data/resource` pada output.
 Timestamp output otomatis dinaikkan agar sesuai dengan kebutuhan update
 metadata Crossref.
 
@@ -65,14 +67,19 @@ mengandung elemen tersebut.
 2. Atau pilih `Tulis DOI lama`, masukkan satu DOI per baris, lalu klik
    `Ambil Metadata Lengkap Crossref`.
 3. Upload XML baru.
-4. Aplikasi otomatis membuat XML akhir jika jumlah artikel lama dan baru sama
+4. Jika perlu, isi URL website baru artikel satu URL per baris sesuai urutan
+   artikel pada XML baru.
+5. Aplikasi otomatis membuat XML akhir jika jumlah artikel lama dan baru sama
    serta pemetaan cukup jelas.
-5. Jika perlu, koreksi pemetaan artikel di tabel lalu klik `Generate Ulang`.
-6. Copy XML dari layar atau download sebagai file `.xml`.
+6. Jika perlu, koreksi pemetaan artikel di tabel lalu klik `Generate Ulang`.
+7. Cek ringkasan DOI dan URL artikel yang dipakai, lalu copy XML dari layar
+   atau download sebagai file `.xml`.
 
 ## Batasan V1
 
 - Fokus pada DOI artikel Crossref di `journal_article/doi_data/doi`.
+- URL artikel baru hanya mengubah `journal_article/doi_data/resource` pada
+  artikel yang dipetakan.
 - DOI journal-level, issue-level, dan component/supplementary tidak diubah.
 - Validasi yang disediakan adalah validasi struktur dasar, bukan validasi XSD
   penuh Crossref.

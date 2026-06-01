@@ -209,11 +209,26 @@ textarea {
   line-height: 1.5;
 }
 
+.url-input-panel {
+  margin-top: 14px;
+}
+
+.url-input-panel textarea {
+  min-height: 104px;
+}
+
 .field-help {
   margin: 0;
   color: var(--muted);
   font-size: 13px;
   line-height: 1.45;
+}
+
+.field-help code {
+  color: var(--accent-dark);
+  font-family:
+    "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  font-size: 12px;
 }
 
 .file-drop:hover {
@@ -547,6 +562,40 @@ textarea {
 
 .button.secondary:hover:not(:disabled) {
   border-color: var(--accent);
+}
+
+.output-resource-summary {
+  margin-top: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #fafbf8;
+  padding: 12px;
+}
+
+.output-resource-summary h3 {
+  margin: 0 0 10px;
+  font-size: 15px;
+  line-height: 1.3;
+}
+
+.output-resource-summary ul {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.output-resource-summary li {
+  display: grid;
+  gap: 3px;
+  overflow-wrap: anywhere;
+}
+
+.output-resource-summary a {
+  color: var(--accent-dark);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
 }
 
 #xmlOutput {

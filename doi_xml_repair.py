@@ -28,18 +28,33 @@ def analyze_xml_json(xml_text: str) -> str:
     return json.dumps(analyze_xml(xml_text), ensure_ascii=False)
 
 
-def repair_xml_json(old_xml: str, new_xml: str, mapping_json: str) -> str:
+def repair_xml_json(
+    old_xml: str,
+    new_xml: str,
+    mapping_json: str,
+    resource_urls_json: str = "",
+) -> str:
     mapping = json.loads(mapping_json)
-    result = repair_xml(old_xml, new_xml, mapping)
+    resource_urls = json.loads(resource_urls_json) if resource_urls_json else None
+    result = repair_xml(old_xml, new_xml, mapping, resource_urls=resource_urls)
     return json.dumps(result, ensure_ascii=False)
 
 
 def repair_xml_with_dois_json(
-    old_dois_json: str, new_xml: str, mapping_json: str
+    old_dois_json: str,
+    new_xml: str,
+    mapping_json: str,
+    resource_urls_json: str = "",
 ) -> str:
     old_dois = json.loads(old_dois_json)
     mapping = json.loads(mapping_json)
-    result = repair_xml_with_dois(old_dois, new_xml, mapping)
+    resource_urls = json.loads(resource_urls_json) if resource_urls_json else None
+    result = repair_xml_with_dois(
+        old_dois,
+        new_xml,
+        mapping,
+        resource_urls=resource_urls,
+    )
     return json.dumps(result, ensure_ascii=False)
 
 
@@ -71,7 +86,12 @@ def analyze_xml(xml_text: str) -> dict[str, Any]:
     }
 
 
-def repair_xml(old_xml: str, new_xml: str, mapping: Any) -> dict[str, Any]:
+def repair_xml(
+    old_xml: str,
+    new_xml: str,
+    mapping: Any,
+    resource_urls: Any = None,
+) -> dict[str, Any]:
     old_root, _old_namespaces = _parse_crossref_xml(old_xml)
     new_root, new_namespaces = _parse_crossref_xml(new_xml)
 
@@ -83,11 +103,15 @@ def repair_xml(old_xml: str, new_xml: str, mapping: Any) -> dict[str, Any]:
         mapping,
         old_timestamp=_timestamp_value(old_root),
         old_source_label="XML lama",
+        resource_urls=resource_urls,
     )
 
 
 def repair_xml_with_dois(
-    old_dois: list[str], new_xml: str, mapping: Any
+    old_dois: list[str],
+    new_xml: str,
+    mapping: Any,
+    resource_urls: Any = None,
 ) -> dict[str, Any]:
     new_root, new_namespaces = _parse_crossref_xml(new_xml)
     old_articles = _articles_from_dois(old_dois)
@@ -97,6 +121,7 @@ def repair_xml_with_dois(
         new_namespaces,
         mapping,
         old_source_label="DOI lama",
+        resource_urls=resource_urls,
     )
 
 
@@ -107,15 +132,23 @@ def _repair_with_old_articles(
     mapping: Any,
     old_timestamp: str = "",
     old_source_label: str = "data lama",
+    resource_urls: Any = None,
 ) -> dict[str, Any]:
     new_articles = _extract_articles(new_root)
     normalized_mapping = _normalize_mapping(mapping, len(old_articles), len(new_articles))
+    normalized_resource_urls = _normalize_resource_urls(
+        resource_urls,
+        len(new_articles),
+    )
 
     output_root = deepcopy(new_root)
     output_articles = _journal_articles(output_root)
     for new_index, old_index in normalized_mapping.items():
         doi_el = _article_doi_element(output_articles[new_index])
         doi_el.text = old_articles[old_index]["doi"]
+        new_resource_url = normalized_resource_urls[new_index]
+        if new_resource_url:
+            _set_article_resource(output_articles[new_index], new_resource_url)
 
     new_ts = _timestamp_value(output_root)
     output_ts = _next_timestamp(old_timestamp, new_ts)
@@ -142,12 +175,14 @@ def _repair_with_old_articles(
         warnings.append(
             "DOI lama yang tidak dipakai: " + ", ".join(unused_old)
         )
-
     return {
         "xml": xml_output,
         "timestamp": output_ts,
         "timestamp_source": "incremented",
         "article_count": len(new_articles),
+        "resource_url_override_count": sum(
+            1 for url in normalized_resource_urls if url
+        ),
         "warnings": warnings,
         "mapping": [
             {
@@ -155,6 +190,7 @@ def _repair_with_old_articles(
                 "old_index": old_index,
                 "doi": old_articles[old_index]["doi"],
                 "new_title": new_articles[new_index]["title"],
+                "resource_url": _article_resource(output_articles[new_index]),
             }
             for new_index, old_index in sorted(normalized_mapping.items())
         ],
@@ -270,6 +306,7 @@ def _extract_articles(root: ET.Element) -> list[dict[str, Any]]:
                 "title": title or "(tanpa judul)",
                 "year": year,
                 "first_page": first_page,
+                "resource_url": _article_resource(article),
             }
         )
     return articles
@@ -281,10 +318,41 @@ def _article_doi(article: ET.Element) -> str:
 
 
 def _article_doi_element(article: ET.Element) -> ET.Element | None:
-    doi_data = _first_direct_child(article, "doi_data")
+    doi_data = _article_doi_data(article)
     if doi_data is None:
         return None
     return _first_direct_child(doi_data, "doi")
+
+
+def _article_doi_data(article: ET.Element) -> ET.Element | None:
+    return _first_direct_child(article, "doi_data")
+
+
+def _article_resource(article: ET.Element) -> str:
+    doi_data = _article_doi_data(article)
+    if doi_data is None:
+        return ""
+    return _text(_first_direct_child(doi_data, "resource"))
+
+
+def _set_article_resource(article: ET.Element, resource_url: str) -> None:
+    doi_data = _article_doi_data(article)
+    if doi_data is None:
+        doi_data = ET.Element(_qualified_name(article, "doi_data"))
+        article.append(doi_data)
+
+    resource_el = _first_direct_child(doi_data, "resource")
+    if resource_el is None:
+        resource_el = ET.Element(_qualified_name(article, "resource"))
+        doi_el = _first_direct_child(doi_data, "doi")
+        children = list(doi_data)
+        insert_at = (
+            children.index(doi_el) + 1
+            if doi_el in children
+            else len(children)
+        )
+        doi_data.insert(insert_at, resource_el)
+    resource_el.text = resource_url
 
 
 def _article_title(article: ET.Element) -> str:
@@ -374,6 +442,36 @@ def _normalize_mapping(
         )
 
     return mapping_items
+
+
+def _normalize_resource_urls(resource_urls: Any, new_count: int) -> list[str]:
+    if resource_urls is None:
+        return [""] * new_count
+    if not isinstance(resource_urls, list):
+        raise XmlRepairError("Format URL artikel baru harus berupa daftar.")
+
+    cleaned = [str(url or "").strip() for url in resource_urls]
+    if not any(cleaned):
+        return [""] * new_count
+    if len(cleaned) != new_count:
+        raise XmlRepairError(
+            "Jumlah URL artikel baru harus sama dengan jumlah artikel XML baru: "
+            f"{len(cleaned)} URL untuk {new_count} artikel."
+        )
+
+    invalid_urls = [
+        str(index + 1)
+        for index, url in enumerate(cleaned)
+        if url and not re.match(r"^https?://", url, flags=re.I)
+    ]
+    if invalid_urls:
+        raise XmlRepairError(
+            "URL artikel baru harus diawali http:// atau https://. Baris: "
+            + ", ".join(invalid_urls)
+            + "."
+        )
+
+    return cleaned
 
 
 def _timestamp_value(root: ET.Element) -> str:
