@@ -16,6 +16,7 @@ const state = {
   oldDoiText: "",
   oldDoiArticles: [],
   newText: "",
+  newResourceMode: "xml",
   newUrlText: "",
   oldAnalysis: null,
   newAnalysis: null,
@@ -29,6 +30,8 @@ const els = {
   oldDoiInput: document.querySelector("#oldDoiInput"),
   lookupDoiButton: document.querySelector("#lookupDoiButton"),
   newXmlInput: document.querySelector("#newXmlInput"),
+  newResourceModes: [...document.querySelectorAll("input[name='newResourceMode']")],
+  newUrlPanel: document.querySelector("#newUrlPanel"),
   newUrlInput: document.querySelector("#newUrlInput"),
   oldFileName: document.querySelector("#oldFileName"),
   newFileName: document.querySelector("#newFileName"),
@@ -62,6 +65,9 @@ function bindEvents() {
   els.oldDoiInput.addEventListener("input", handleDoiTextInput);
   els.lookupDoiButton.addEventListener("click", lookupOldDois);
   els.newXmlInput.addEventListener("change", () => handleFileChange("new"));
+  els.newResourceModes.forEach((input) => {
+    input.addEventListener("change", handleNewResourceModeChange);
+  });
   els.newUrlInput.addEventListener("input", handleNewUrlInput);
   els.generateButton.addEventListener("click", generateXml);
   els.resetButton.addEventListener("click", resetApp);
@@ -84,7 +90,10 @@ async function bootPython() {
     els.oldXmlInput.disabled = false;
     els.oldDoiInput.disabled = false;
     els.newXmlInput.disabled = false;
-    els.newUrlInput.disabled = false;
+    els.newResourceModes.forEach((input) => {
+      input.disabled = false;
+    });
+    setNewResourceMode("xml", { clear: false });
     setOldMode("xml");
   } catch (error) {
     setNotice(
@@ -136,6 +145,24 @@ function handleDoiTextInput() {
   els.lookupDoiButton.disabled = parseDoiLines(state.oldDoiText).length === 0;
   renderDoiSummary();
   renderMapping();
+}
+
+function handleNewResourceModeChange(event) {
+  setNewResourceMode(event.target.value);
+}
+
+function setNewResourceMode(mode, options = {}) {
+  state.newResourceMode = mode;
+  els.newResourceModes.forEach((input) => {
+    input.checked = input.value === mode;
+  });
+  const manualMode = mode === "manual";
+  els.newUrlPanel.hidden = !manualMode;
+  els.newUrlInput.disabled = !manualMode;
+  if (options.clear !== false) {
+    clearOutput();
+    renderMapping();
+  }
 }
 
 function handleNewUrlInput() {
@@ -625,6 +652,7 @@ function resetApp() {
   state.oldDoiText = "";
   state.oldDoiArticles = [];
   state.newText = "";
+  state.newResourceMode = "xml";
   state.newUrlText = "";
   state.oldAnalysis = null;
   state.newAnalysis = null;
@@ -640,6 +668,7 @@ function resetApp() {
   els.newSummary.className = "summary muted";
   els.oldSummary.textContent = "Belum ada file.";
   els.newSummary.textContent = "Belum ada file.";
+  setNewResourceMode("xml", { clear: false });
   setOldMode("xml");
 }
 
@@ -715,8 +744,21 @@ function articleResourceLabel(article, overrideUrl) {
 }
 
 function validateNewArticleUrls() {
+  if (state.newResourceMode !== "manual") {
+    return { valid: true, urls: [], message: "" };
+  }
   const urls = parseArticleUrlLines(state.newUrlText);
-  if (!state.newAnalysis || !urls.length) {
+  if (!state.newAnalysis && !urls.length) {
+    return { valid: true, urls, message: "" };
+  }
+  if (state.newAnalysis && !urls.length) {
+    return {
+      valid: false,
+      urls,
+      message: "Mode URL manual dipilih. Tulis URL artikel baru satu URL per artikel, atau pilih Pakai URL dari XML baru.",
+    };
+  }
+  if (!state.newAnalysis) {
     return { valid: true, urls, message: "" };
   }
   const expectedCount = state.newAnalysis.article_count;

@@ -85,7 +85,17 @@
             <span id="newFileName">Pilih file XML baru</span>
             <input id="newXmlInput" type="file" accept=".xml,text/xml,application/xml" disabled />
           </label>
-          <div class="doi-input-panel url-input-panel">
+          <div class="mode-toggle resource-toggle" role="radiogroup" aria-label="Sumber URL artikel output">
+            <label>
+              <input type="radio" name="newResourceMode" value="xml" checked disabled />
+              Pakai URL dari XML baru
+            </label>
+            <label>
+              <input type="radio" name="newResourceMode" value="manual" disabled />
+              Tulis URL baru
+            </label>
+          </div>
+          <div class="doi-input-panel url-input-panel" id="newUrlPanel" hidden>
             <label for="newUrlInput">URL website baru artikel</label>
             <textarea
               id="newUrlInput"
@@ -94,8 +104,8 @@
               disabled
             ></textarea>
             <p class="field-help">
-              Opsional. Tulis satu URL per artikel sesuai urutan XML baru.
-              Jika diisi, URL ini dipakai sebagai
+              Tulis satu URL per artikel sesuai urutan XML baru. Pada mode ini,
+              URL manual dipakai sebagai
               <code>journal_article/doi_data/resource</code> pada output.
             </p>
           </div>

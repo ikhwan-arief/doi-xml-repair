@@ -186,6 +186,10 @@ textarea {
   accent-color: var(--accent);
 }
 
+.resource-toggle {
+  margin-top: 14px;
+}
+
 .doi-input-panel {
   display: grid;
   gap: 10px;
