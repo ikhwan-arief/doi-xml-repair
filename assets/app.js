@@ -1,3 +1,11 @@
+/*
+ * DOI XML Repair
+ * Hak cipta (c) 2026 Ikhwan Arief (ikhwan[at]unand.ac.id).
+ * Aplikasi ini dapat digunakan oleh publik berdasarkan lisensi Creative
+ * Commons Attribution-NonCommercial (CC BY-NC) untuk tujuan nonkomersial
+ * dengan atribusi yang jelas kepada pembuat.
+ */
+
 const state = {
   pyodide: null,
   analyzeXml: null,
@@ -10,7 +18,6 @@ const state = {
 };
 
 const els = {
-  runtimeStatus: document.querySelector("#runtimeStatus"),
   oldXmlInput: document.querySelector("#oldXmlInput"),
   newXmlInput: document.querySelector("#newXmlInput"),
   oldFileName: document.querySelector("#oldFileName"),
@@ -46,7 +53,6 @@ function bindEvents() {
 }
 
 async function bootPython() {
-  setRuntime("Memuat Python...", "");
   try {
     state.pyodide = await loadPyodide();
     const response = await fetch("doi_xml_repair.py", { cache: "no-store" });
@@ -59,12 +65,10 @@ async function bootPython() {
     state.repairXml = state.pyodide.globals.get("repair_xml_json");
     els.oldXmlInput.disabled = false;
     els.newXmlInput.disabled = false;
-    setRuntime("Python siap", "ready");
   } catch (error) {
-    setRuntime("Runtime gagal dimuat", "error");
     setNotice(
       els.mappingStatus,
-      `Python runtime gagal dimuat: ${cleanError(error)}`,
+      `Runtime Python gagal dimuat: ${cleanError(error)}`,
       "error",
     );
   }
@@ -349,11 +353,6 @@ function clearOutput() {
     "Output akan dibuat otomatis setelah kedua XML diupload.",
     "",
   );
-}
-
-function setRuntime(message, type) {
-  els.runtimeStatus.textContent = message;
-  els.runtimeStatus.className = `runtime ${type}`.trim();
 }
 
 function setNotice(element, message, type) {

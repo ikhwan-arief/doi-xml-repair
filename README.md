@@ -1,5 +1,12 @@
 # DOI XML Repair
 
+Hak cipta (c) 2026 Ikhwan Arief (ikhwan[at]unand.ac.id). Aplikasi ini dibuat
+oleh Ikhwan Arief dan dapat digunakan oleh publik berdasarkan lisensi Creative
+Commons Attribution-NonCommercial (CC BY-NC). Penggunaan, adaptasi, dan
+distribusi diperkenankan untuk tujuan nonkomersial dengan atribusi yang jelas
+kepada pembuat. Penggunaan komersial memerlukan izin tertulis dari pemegang hak
+cipta.
+
 Aplikasi statis untuk GitHub Pages yang memperbaiki XML Crossref dengan
 mengunci DOI artikel lama secara penuh. Metadata diambil dari XML baru, tetapi
 nilai `journal_article/doi_data/doi` pada output disalin dari XML lama.
@@ -53,3 +60,12 @@ mengandung elemen tersebut.
 - Validasi yang disediakan adalah validasi struktur dasar, bukan validasi XSD
   penuh Crossref.
 - Tidak ada submit otomatis ke Crossref.
+
+## Hak Cipta dan Lisensi
+
+Hak cipta (c) 2026 Ikhwan Arief (ikhwan[at]unand.ac.id). Aplikasi ini dibuat
+oleh Ikhwan Arief dan dapat digunakan oleh publik berdasarkan lisensi Creative
+Commons Attribution-NonCommercial (CC BY-NC). Penggunaan, adaptasi, dan
+distribusi diperkenankan untuk tujuan nonkomersial dengan atribusi yang jelas
+kepada pembuat. Penggunaan komersial memerlukan izin tertulis dari pemegang hak
+cipta.

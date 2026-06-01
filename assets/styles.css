@@ -1,3 +1,11 @@
+/*
+ * DOI XML Repair
+ * Hak cipta (c) 2026 Ikhwan Arief (ikhwan[at]unand.ac.id).
+ * Aplikasi ini dapat digunakan oleh publik berdasarkan lisensi Creative
+ * Commons Attribution-NonCommercial (CC BY-NC) untuk tujuan nonkomersial
+ * dengan atribusi yang jelas kepada pembuat.
+ */
+
 :root {
   color-scheme: light;
   --bg: #f4f6f1;
@@ -66,29 +74,6 @@ textarea {
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-}
-
-.runtime {
-  align-self: flex-start;
-  min-width: 190px;
-  padding: 10px 12px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  background: var(--surface);
-  color: var(--muted);
-  font-size: 14px;
-  text-align: center;
-  box-shadow: var(--shadow);
-}
-
-.runtime.ready {
-  border-color: rgba(15, 107, 87, 0.25);
-  color: var(--accent-dark);
-}
-
-.runtime.error {
-  border-color: rgba(163, 58, 43, 0.28);
-  color: var(--danger);
 }
 
 .workspace {
@@ -395,15 +380,26 @@ textarea {
   line-height: 1.55;
 }
 
+.site-footer {
+  width: min(1280px, calc(100% - 40px));
+  margin: 0 auto 36px;
+  border-top: 1px solid var(--line);
+  padding-top: 18px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.site-footer p {
+  max-width: 960px;
+  margin: 0;
+}
+
 @media (max-width: 860px) {
   .app-header,
   .section-title {
     flex-direction: column;
     align-items: stretch;
-  }
-
-  .runtime {
-    width: 100%;
   }
 
   .upload-grid {
@@ -422,5 +418,9 @@ textarea {
 
   .button {
     width: 100%;
+  }
+
+  .site-footer {
+    width: min(100% - 24px, 1280px);
   }
 }
