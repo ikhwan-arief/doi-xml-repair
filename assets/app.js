@@ -54,6 +54,7 @@ document.addEventListener("DOMContentLoaded", () => {
     window.lucide.createIcons();
   }
   bindEvents();
+  setNewResourceMode(state.newResourceMode, { clear: false });
   bootPython();
 });
 
@@ -90,10 +91,6 @@ async function bootPython() {
     els.oldXmlInput.disabled = false;
     els.oldDoiInput.disabled = false;
     els.newXmlInput.disabled = false;
-    els.newResourceModes.forEach((input) => {
-      input.disabled = false;
-    });
-    setNewResourceMode("xml", { clear: false });
     setOldMode("xml");
   } catch (error) {
     setNotice(
