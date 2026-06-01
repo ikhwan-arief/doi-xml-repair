@@ -34,6 +34,15 @@ def repair_xml_json(old_xml: str, new_xml: str, mapping_json: str) -> str:
     return json.dumps(result, ensure_ascii=False)
 
 
+def repair_xml_with_dois_json(
+    old_dois_json: str, new_xml: str, mapping_json: str
+) -> str:
+    old_dois = json.loads(old_dois_json)
+    mapping = json.loads(mapping_json)
+    result = repair_xml_with_dois(old_dois, new_xml, mapping)
+    return json.dumps(result, ensure_ascii=False)
+
+
 def analyze_xml(xml_text: str) -> dict[str, Any]:
     root, _namespaces = _parse_crossref_xml(xml_text)
     articles = _extract_articles(root)
@@ -67,6 +76,38 @@ def repair_xml(old_xml: str, new_xml: str, mapping: Any) -> dict[str, Any]:
     new_root, new_namespaces = _parse_crossref_xml(new_xml)
 
     old_articles = _extract_articles(old_root)
+    return _repair_with_old_articles(
+        old_articles,
+        new_root,
+        new_namespaces,
+        mapping,
+        old_timestamp=_timestamp_value(old_root),
+        old_source_label="XML lama",
+    )
+
+
+def repair_xml_with_dois(
+    old_dois: list[str], new_xml: str, mapping: Any
+) -> dict[str, Any]:
+    new_root, new_namespaces = _parse_crossref_xml(new_xml)
+    old_articles = _articles_from_dois(old_dois)
+    return _repair_with_old_articles(
+        old_articles,
+        new_root,
+        new_namespaces,
+        mapping,
+        old_source_label="DOI lama",
+    )
+
+
+def _repair_with_old_articles(
+    old_articles: list[dict[str, Any]],
+    new_root: ET.Element,
+    new_namespaces: list[tuple[str, str]],
+    mapping: Any,
+    old_timestamp: str = "",
+    old_source_label: str = "data lama",
+) -> dict[str, Any]:
     new_articles = _extract_articles(new_root)
     normalized_mapping = _normalize_mapping(mapping, len(old_articles), len(new_articles))
 
@@ -76,9 +117,8 @@ def repair_xml(old_xml: str, new_xml: str, mapping: Any) -> dict[str, Any]:
         doi_el = _article_doi_element(output_articles[new_index])
         doi_el.text = old_articles[old_index]["doi"]
 
-    old_ts = _timestamp_value(old_root)
     new_ts = _timestamp_value(output_root)
-    output_ts = _next_timestamp(old_ts, new_ts)
+    output_ts = _next_timestamp(old_timestamp, new_ts)
     _set_timestamp(output_root, output_ts)
 
     _register_namespaces(new_namespaces, output_root)
@@ -91,7 +131,7 @@ def repair_xml(old_xml: str, new_xml: str, mapping: Any) -> dict[str, Any]:
         )
     if len(old_articles) != len(new_articles):
         warnings.append(
-            f"Jumlah artikel berbeda: XML lama {len(old_articles)}, XML baru {len(new_articles)}."
+            f"Jumlah artikel berbeda: {old_source_label} {len(old_articles)}, XML baru {len(new_articles)}."
         )
     unused_old = [
         article["doi"]
@@ -119,6 +159,33 @@ def repair_xml(old_xml: str, new_xml: str, mapping: Any) -> dict[str, Any]:
             for new_index, old_index in sorted(normalized_mapping.items())
         ],
     }
+
+
+def _articles_from_dois(old_dois: list[str]) -> list[dict[str, Any]]:
+    cleaned = [_normalize_doi_input(doi) for doi in old_dois]
+    cleaned = [doi for doi in cleaned if doi]
+    if not cleaned:
+        raise XmlRepairError("Daftar DOI lama kosong.")
+
+    duplicate_dois = sorted({doi for doi in cleaned if cleaned.count(doi) > 1})
+    if duplicate_dois:
+        raise XmlRepairError(
+            "Satu DOI lama tidak boleh ditulis lebih dari sekali: "
+            + ", ".join(duplicate_dois)
+            + "."
+        )
+
+    return [
+        {
+            "index": index,
+            "number": index + 1,
+            "doi": doi,
+            "title": f"DOI lama {index + 1}",
+            "year": "",
+            "first_page": "",
+        }
+        for index, doi in enumerate(cleaned)
+    ]
 
 
 def _parse_crossref_xml(xml_text: str) -> tuple[ET.Element, list[tuple[str, str]]]:
@@ -381,3 +448,10 @@ def _text(element: ET.Element | None) -> str:
 
 def _collapse_text(value: str) -> str:
     return re.sub(r"\s+", " ", value).strip()
+
+
+def _normalize_doi_input(value: Any) -> str:
+    doi = str(value or "").strip()
+    doi = re.sub(r"^https?://(dx\.)?doi\.org/", "", doi, flags=re.I)
+    doi = re.sub(r"^doi:\s*", "", doi, flags=re.I)
+    return doi.strip()

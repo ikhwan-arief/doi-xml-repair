@@ -10,7 +10,11 @@ const state = {
   pyodide: null,
   analyzeXml: null,
   repairXml: null,
+  repairXmlWithDois: null,
+  oldMode: "xml",
   oldText: "",
+  oldDoiText: "",
+  oldDoiArticles: [],
   newText: "",
   oldAnalysis: null,
   newAnalysis: null,
@@ -18,7 +22,11 @@ const state = {
 };
 
 const els = {
+  oldInputModes: [...document.querySelectorAll("input[name='oldInputMode']")],
   oldXmlInput: document.querySelector("#oldXmlInput"),
+  oldDoiPanel: document.querySelector("#oldDoiPanel"),
+  oldDoiInput: document.querySelector("#oldDoiInput"),
+  lookupDoiButton: document.querySelector("#lookupDoiButton"),
   newXmlInput: document.querySelector("#newXmlInput"),
   oldFileName: document.querySelector("#oldFileName"),
   newFileName: document.querySelector("#newFileName"),
@@ -44,7 +52,12 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 function bindEvents() {
+  els.oldInputModes.forEach((input) => {
+    input.addEventListener("change", handleOldModeChange);
+  });
   els.oldXmlInput.addEventListener("change", () => handleFileChange("old"));
+  els.oldDoiInput.addEventListener("input", handleDoiTextInput);
+  els.lookupDoiButton.addEventListener("click", lookupOldDois);
   els.newXmlInput.addEventListener("change", () => handleFileChange("new"));
   els.generateButton.addEventListener("click", generateXml);
   els.resetButton.addEventListener("click", resetApp);
@@ -63,8 +76,11 @@ async function bootPython() {
     await state.pyodide.runPythonAsync(pythonCode);
     state.analyzeXml = state.pyodide.globals.get("analyze_xml_json");
     state.repairXml = state.pyodide.globals.get("repair_xml_json");
+    state.repairXmlWithDois = state.pyodide.globals.get("repair_xml_with_dois_json");
     els.oldXmlInput.disabled = false;
+    els.oldDoiInput.disabled = false;
     els.newXmlInput.disabled = false;
+    setOldMode("xml");
   } catch (error) {
     setNotice(
       els.mappingStatus,
@@ -72,6 +88,49 @@ async function bootPython() {
       "error",
     );
   }
+}
+
+function handleOldModeChange(event) {
+  setOldMode(event.target.value);
+}
+
+function setOldMode(mode) {
+  state.oldMode = mode;
+  clearOutput();
+  els.oldInputModes.forEach((input) => {
+    input.checked = input.value === mode;
+  });
+  els.oldXmlInput.closest(".file-drop").hidden = mode !== "xml";
+  els.oldDoiPanel.hidden = mode !== "doi";
+
+  if (mode === "xml") {
+    state.oldDoiArticles = [];
+    state.oldDoiText = "";
+    els.oldDoiInput.value = "";
+    els.lookupDoiButton.disabled = true;
+    if (!state.oldAnalysis) {
+      els.oldSummary.className = "summary muted";
+      els.oldSummary.textContent = "Belum ada file.";
+    } else {
+      renderSummary(els.oldSummary, state.oldAnalysis);
+    }
+  } else {
+    state.oldText = "";
+    state.oldAnalysis = null;
+    els.oldXmlInput.value = "";
+    els.oldFileName.textContent = "Pilih file XML lama";
+    renderDoiSummary();
+  }
+  renderMapping();
+}
+
+function handleDoiTextInput() {
+  state.oldDoiText = els.oldDoiInput.value;
+  state.oldDoiArticles = [];
+  clearOutput();
+  els.lookupDoiButton.disabled = parseDoiLines(state.oldDoiText).length === 0;
+  renderDoiSummary();
+  renderMapping();
 }
 
 async function handleFileChange(kind) {
@@ -150,22 +209,160 @@ function renderSummary(container, analysis) {
   `;
 }
 
+async function lookupOldDois() {
+  const dois = parseDoiLines(state.oldDoiText);
+  clearOutput();
+  if (!dois.length) {
+    setNotice(els.oldSummary, "Tulis minimal satu DOI lama.", "warn");
+    return;
+  }
+  const duplicateDois = dois.filter((doi, index) => dois.indexOf(doi) !== index);
+  if (duplicateDois.length) {
+    state.oldDoiArticles = [];
+    renderDoiSummary([
+      `DOI lama tidak boleh ditulis lebih dari sekali: ${[...new Set(duplicateDois)].join(", ")}.`,
+    ]);
+    renderMapping();
+    return;
+  }
+
+  els.lookupDoiButton.disabled = true;
+  setNotice(
+    els.oldSummary,
+    `Mengambil metadata ${dois.length} DOI dari Crossref...`,
+    "",
+  );
+
+  const articles = [];
+  const failures = [];
+  for (const [index, doi] of dois.entries()) {
+    try {
+      const metadata = await fetchCrossrefWork(doi);
+      articles.push(articleFromCrossref(metadata, doi, index));
+      if (index < dois.length - 1) {
+        await wait(250);
+      }
+    } catch (error) {
+      failures.push(`${doi}: ${cleanError(error)}`);
+    }
+  }
+
+  els.lookupDoiButton.disabled = parseDoiLines(state.oldDoiText).length === 0;
+  if (failures.length) {
+    state.oldDoiArticles = [];
+    renderDoiSummary(failures);
+  } else {
+    state.oldDoiArticles = articles;
+    renderDoiSummary();
+  }
+  renderMapping();
+}
+
+async function fetchCrossrefWork(doi) {
+  const url = `https://api.crossref.org/works/${encodeURIComponent(doi)}`;
+  const response = await fetch(url, {
+    headers: {
+      Accept: "application/json",
+    },
+  });
+  if (response.status === 404) {
+    throw new Error("DOI tidak ditemukan di Crossref.");
+  }
+  if (response.status === 429) {
+    throw new Error("Rate limit Crossref tercapai. Coba ulang beberapa saat lagi.");
+  }
+  if (!response.ok) {
+    throw new Error(`Crossref mengembalikan status ${response.status}.`);
+  }
+  const payload = await response.json();
+  return payload.message;
+}
+
+function articleFromCrossref(work, requestedDoi, index) {
+  const title = firstArrayValue(work.title) || "(judul tidak tersedia di Crossref)";
+  const year = yearFromDateParts(
+    work.published?.["date-parts"] ||
+      work.issued?.["date-parts"] ||
+      work["published-print"]?.["date-parts"] ||
+      work["published-online"]?.["date-parts"],
+  );
+  return {
+    index,
+    number: index + 1,
+    doi: normalizeDoi(work.DOI || requestedDoi),
+    title,
+    year,
+    first_page: firstPageFromPage(work.page || ""),
+    container_title: firstArrayValue(work["container-title"]),
+    volume: work.volume || "",
+    issue: work.issue || work["journal-issue"]?.issue || "",
+    source: "crossref",
+  };
+}
+
+function renderDoiSummary(failures = []) {
+  if (state.oldMode !== "doi") return;
+  const pendingDois = parseDoiLines(state.oldDoiText);
+
+  if (!pendingDois.length) {
+    els.oldSummary.className = "summary muted";
+    els.oldSummary.textContent = "Belum ada DOI.";
+    return;
+  }
+
+  if (!state.oldDoiArticles.length && !failures.length) {
+    els.oldSummary.className = "summary muted";
+    els.oldSummary.textContent = `${pendingDois.length} DOI siap dicek ke Crossref.`;
+    return;
+  }
+
+  const warnings = failures.length
+    ? `<div class="notice error">${escapeHtml(failures.join(" "))}</div>`
+    : "";
+  const articles = state.oldDoiArticles
+    .map(
+      (article) => `
+        <li class="article-item">
+          <span class="article-title">${escapeHtml(article.number)}. ${escapeHtml(article.title)}</span>
+          <div class="doi-code">${escapeHtml(article.doi)}</div>
+          <div class="article-meta">${formatCrossrefMeta(article)}</div>
+        </li>
+      `,
+    )
+    .join("");
+
+  els.oldSummary.className = "summary";
+  els.oldSummary.innerHTML = `
+    <div class="summary-header">
+      <span>${escapeHtml(state.oldDoiArticles.length)} DOI ditemukan</span>
+      <span>Sumber: Crossref REST API</span>
+    </div>
+    ${warnings}
+    <ul class="article-list">${articles}</ul>
+  `;
+}
+
 function renderMapping() {
-  const oldArticles = state.oldAnalysis?.articles || [];
+  const oldArticles = currentOldArticles();
   const newArticles = state.newAnalysis?.articles || [];
   els.mappingBody.innerHTML = "";
   els.mappingTable.hidden = true;
   els.generateButton.disabled = true;
 
-  if (!state.oldAnalysis || !state.newAnalysis) {
-    setNotice(els.mappingStatus, "Upload kedua XML untuk membuat XML akhir.", "");
+  if (!oldArticles.length || !state.newAnalysis) {
+    const message =
+      state.oldMode === "doi"
+        ? "Ambil metadata DOI lama dari Crossref, lalu upload XML baru."
+        : "Upload kedua XML untuk membuat XML akhir.";
+    setNotice(els.mappingStatus, message, "");
     return;
   }
 
   const warnings = [];
   if (oldArticles.length !== newArticles.length) {
+    const oldLabel = state.oldMode === "doi" ? "DOI lama" : "XML lama";
     warnings.push(
-      `Jumlah artikel berbeda: XML lama ${oldArticles.length}, XML baru ${newArticles.length}.`,
+      `Jumlah artikel berbeda: ${oldLabel} ${oldArticles.length}, XML baru ${newArticles.length}.`,
     );
   }
 
@@ -191,9 +388,10 @@ function renderMapping() {
       );
       select.append(option);
     });
-    if (oldArticles.length === newArticles.length) {
-      select.value = String(index);
-    }
+    const picked = pickOldArticleIndex(newArticle, oldArticles, index);
+    select.value = picked.value;
+    select.dataset.matchScore = String(picked.score);
+    select.dataset.matchMethod = picked.method;
     select.addEventListener("change", () => {
       clearOutput();
       validateMapping();
@@ -216,7 +414,11 @@ function renderMapping() {
     );
   }
   const valid = validateMapping();
-  if (valid && oldArticles.length === newArticles.length) {
+  if (
+    valid &&
+    oldArticles.length === newArticles.length &&
+    (state.oldMode === "xml" || hasHighConfidenceMapping())
+  ) {
     generateXml({ auto: true });
   }
 }
@@ -245,20 +447,25 @@ function validateMapping() {
       "Satu DOI lama tidak boleh dipakai lebih dari sekali.",
       "error",
     );
-  } else if (!complete && state.oldAnalysis && state.newAnalysis) {
+  } else if (!complete && currentOldArticles().length && state.newAnalysis) {
     setNotice(
       els.mappingStatus,
       "Semua artikel baru harus dipasangkan dengan DOI lama.",
       "warn",
     );
-  } else if (state.oldAnalysis && state.newAnalysis) {
-    const oldCount = state.oldAnalysis.articles.length;
+  } else if (currentOldArticles().length && state.newAnalysis) {
+    const oldCount = currentOldArticles().length;
     const newCount = state.newAnalysis.articles.length;
-    const type = oldCount === newCount ? "success" : "warn";
-    const message =
+    let type = oldCount === newCount ? "success" : "warn";
+    let message =
       oldCount === newCount
         ? "Pemetaan valid. XML siap dibuat."
         : `Pemetaan valid, tetapi jumlah artikel berbeda: lama ${oldCount}, baru ${newCount}.`;
+    if (state.oldMode === "doi" && !hasHighConfidenceMapping()) {
+      type = "warn";
+      message =
+        "Pemetaan DOI dari Crossref perlu diperiksa. Jika pasangan artikel sudah benar, klik Generate Ulang.";
+    }
     setNotice(els.mappingStatus, message, type);
   }
 
@@ -276,9 +483,17 @@ function collectMapping() {
 function generateXml(options = {}) {
   clearOutput();
   try {
-    const result = JSON.parse(
-      state.repairXml(state.oldText, state.newText, JSON.stringify(collectMapping())),
-    );
+    const mappingJson = JSON.stringify(collectMapping());
+    const result =
+      state.oldMode === "doi"
+        ? JSON.parse(
+            state.repairXmlWithDois(
+              JSON.stringify(currentOldArticles().map((article) => article.doi)),
+              state.newText,
+              mappingJson,
+            ),
+          )
+        : JSON.parse(state.repairXml(state.oldText, state.newText, mappingJson));
     state.outputXml = result.xml;
     els.xmlOutput.value = result.xml;
     els.copyButton.disabled = false;
@@ -324,11 +539,15 @@ function downloadOutput() {
 
 function resetApp() {
   state.oldText = "";
+  state.oldDoiText = "";
+  state.oldDoiArticles = [];
   state.newText = "";
   state.oldAnalysis = null;
   state.newAnalysis = null;
   state.outputXml = "";
   els.oldXmlInput.value = "";
+  els.oldDoiInput.value = "";
+  els.lookupDoiButton.disabled = true;
   els.newXmlInput.value = "";
   els.oldFileName.textContent = "Pilih file XML lama";
   els.newFileName.textContent = "Pilih file XML baru";
@@ -336,11 +555,7 @@ function resetApp() {
   els.newSummary.className = "summary muted";
   els.oldSummary.textContent = "Belum ada file.";
   els.newSummary.textContent = "Belum ada file.";
-  els.mappingBody.innerHTML = "";
-  els.mappingTable.hidden = true;
-  els.generateButton.disabled = true;
-  setNotice(els.mappingStatus, "Upload kedua XML untuk membuat XML akhir.", "");
-  clearOutput();
+  setOldMode("xml");
 }
 
 function clearOutput() {
@@ -365,6 +580,139 @@ function formatMeta(article) {
   if (article.year) parts.push(`Tahun ${article.year}`);
   if (article.first_page) parts.push(`Hal. ${article.first_page}`);
   return parts.join(" - ") || "Metadata ringkas tidak tersedia";
+}
+
+function formatCrossrefMeta(article) {
+  const parts = [];
+  if (article.container_title) parts.push(article.container_title);
+  if (article.year) parts.push(`Tahun ${article.year}`);
+  if (article.volume) parts.push(`Vol. ${article.volume}`);
+  if (article.issue) parts.push(`No. ${article.issue}`);
+  if (article.first_page) parts.push(`Hal. ${article.first_page}`);
+  return parts.join(" - ") || "Metadata Crossref ringkas tidak tersedia";
+}
+
+function currentOldArticles() {
+  if (state.oldMode === "doi") {
+    return state.oldDoiArticles;
+  }
+  return state.oldAnalysis?.articles || [];
+}
+
+function parseDoiLines(value) {
+  return String(value || "")
+    .split(/\r?\n/)
+    .map((line) => normalizeDoi(line))
+    .filter(Boolean);
+}
+
+function normalizeDoi(value) {
+  return String(value || "")
+    .trim()
+    .replace(/^https?:\/\/(dx\.)?doi\.org\//i, "")
+    .replace(/^doi:\s*/i, "")
+    .trim();
+}
+
+function firstArrayValue(value) {
+  return Array.isArray(value) && value.length ? String(value[0]) : "";
+}
+
+function yearFromDateParts(dateParts) {
+  if (!Array.isArray(dateParts) || !Array.isArray(dateParts[0])) return "";
+  return dateParts[0][0] ? String(dateParts[0][0]) : "";
+}
+
+function firstPageFromPage(page) {
+  return String(page || "").split(/[-–—]/)[0].trim();
+}
+
+function pickOldArticleIndex(newArticle, oldArticles, fallbackIndex) {
+  if (!oldArticles.length) return { value: "", score: 0, method: "empty" };
+  const used = new Set(
+    [...els.mappingBody.querySelectorAll("select")]
+      .map((select) => select.value)
+      .filter(Boolean),
+  );
+  let best = { index: -1, score: -1 };
+  oldArticles.forEach((oldArticle, oldIndex) => {
+    if (used.has(String(oldIndex))) return;
+    const score = matchScore(newArticle, oldArticle);
+    if (score > best.score) {
+      best = { index: oldIndex, score };
+    }
+  });
+  if (best.index >= 0 && best.score >= 45) {
+    return { value: String(best.index), score: Math.round(best.score), method: "match" };
+  }
+  if (fallbackIndex < oldArticles.length && !used.has(String(fallbackIndex))) {
+    return { value: String(fallbackIndex), score: Math.round(best.score), method: "order" };
+  }
+  return { value: "", score: Math.round(best.score), method: "none" };
+}
+
+function hasHighConfidenceMapping() {
+  return [...els.mappingBody.querySelectorAll("select")].every(
+    (select) => select.dataset.matchMethod === "match",
+  );
+}
+
+function matchScore(newArticle, oldArticle) {
+  let score = 0;
+  const titleScore = textSimilarity(newArticle.title, oldArticle.title);
+  score += titleScore * 70;
+  if (newArticle.year && oldArticle.year && newArticle.year === oldArticle.year) {
+    score += 10;
+  }
+  if (
+    newArticle.first_page &&
+    oldArticle.first_page &&
+    newArticle.first_page === oldArticle.first_page
+  ) {
+    score += 10;
+  }
+  if (
+    newArticle.volume &&
+    oldArticle.volume &&
+    newArticle.volume === oldArticle.volume
+  ) {
+    score += 5;
+  }
+  if (
+    newArticle.issue &&
+    oldArticle.issue &&
+    newArticle.issue === oldArticle.issue
+  ) {
+    score += 5;
+  }
+  return score;
+}
+
+function textSimilarity(left, right) {
+  const leftTokens = tokenSet(left);
+  const rightTokens = tokenSet(right);
+  if (!leftTokens.size || !rightTokens.size) return 0;
+  const intersection = [...leftTokens].filter((token) => rightTokens.has(token));
+  const union = new Set([...leftTokens, ...rightTokens]);
+  return intersection.length / union.size;
+}
+
+function tokenSet(value) {
+  return new Set(
+    String(value || "")
+      .toLowerCase()
+      .normalize("NFKD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]+/g, " ")
+      .split(/\s+/)
+      .filter((token) => token.length > 2),
+  );
+}
+
+function wait(ms) {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, ms);
+  });
 }
 
 function cleanError(error) {

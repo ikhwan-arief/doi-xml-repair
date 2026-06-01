@@ -13,6 +13,12 @@ nilai `journal_article/doi_data/doi` pada output disalin dari XML lama.
 Timestamp output otomatis dinaikkan agar sesuai dengan kebutuhan update
 metadata Crossref.
 
+Data lama dapat diberikan dengan dua cara:
+
+- Upload XML lama Crossref.
+- Tulis DOI lama yang sudah terdaftar di Crossref, lalu aplikasi mengambil
+  metadata ringkas melalui Crossref REST API untuk membantu pencocokan artikel.
+
 ## Jalankan Lokal
 
 ```bash
@@ -48,10 +54,13 @@ mengandung elemen tersebut.
 ## Alur Penggunaan
 
 1. Upload XML lama.
-2. Upload XML baru.
-3. Aplikasi otomatis membuat XML akhir jika jumlah artikel lama dan baru sama.
-4. Jika perlu, koreksi pemetaan artikel di tabel lalu klik `Generate Ulang`.
-5. Copy XML dari layar atau download sebagai file `.xml`.
+2. Atau pilih `Tulis DOI lama`, masukkan satu DOI per baris, lalu klik
+   `Ambil Metadata Crossref`.
+3. Upload XML baru.
+4. Aplikasi otomatis membuat XML akhir jika jumlah artikel lama dan baru sama
+   serta pemetaan cukup jelas.
+5. Jika perlu, koreksi pemetaan artikel di tabel lalu klik `Generate Ulang`.
+6. Copy XML dari layar atau download sebagai file `.xml`.
 
 ## Batasan V1
 
@@ -60,6 +69,10 @@ mengandung elemen tersebut.
 - Validasi yang disediakan adalah validasi struktur dasar, bukan validasi XSD
   penuh Crossref.
 - Tidak ada submit otomatis ke Crossref.
+- Mode DOI lama membutuhkan koneksi browser user ke Crossref REST API dan
+  mengikuti rate limit publik Crossref.
+- Metadata Crossref REST API dipakai untuk pencocokan saja. XML akhir tetap
+  dibangun dari XML baru agar deposit berisi metadata lengkap.
 
 ## Hak Cipta dan Lisensi
 

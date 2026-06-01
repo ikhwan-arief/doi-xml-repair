@@ -11,7 +11,12 @@ from xml.etree import ElementTree as ET
 
 import pytest
 
-from doi_xml_repair import XmlRepairError, analyze_xml, repair_xml
+from doi_xml_repair import (
+    XmlRepairError,
+    analyze_xml,
+    repair_xml,
+    repair_xml_with_dois,
+)
 
 
 def _article_dois(xml_text):
@@ -198,6 +203,30 @@ def test_issue_mapping_can_be_out_of_order():
         "New first article",
         "New second article",
     ]
+
+
+def test_repair_from_old_doi_list():
+    result = repair_xml_with_dois(
+        ["https://doi.org/10.5555/ABC.Old-1"],
+        NEW_SINGLE,
+        [{"new_index": 0, "old_index": 0}],
+    )
+
+    assert _article_dois(result["xml"]) == ["10.5555/ABC.Old-1"]
+    assert "New corrected title" in _article_titles(result["xml"])
+    assert int(_timestamp(result["xml"])) > 20240102000000
+
+
+def test_rejects_duplicate_old_doi_list():
+    with pytest.raises(XmlRepairError, match="tidak boleh ditulis lebih dari sekali"):
+        repair_xml_with_dois(
+            ["10.5555/ABC.Old-1", "doi:10.5555/ABC.Old-1"],
+            NEW_ISSUE,
+            [
+                {"new_index": 0, "old_index": 0},
+                {"new_index": 1, "old_index": 1},
+            ],
+        )
 
 
 def test_analyze_reports_article_summary():

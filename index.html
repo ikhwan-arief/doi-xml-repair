@@ -32,15 +32,43 @@
           <div class="panel-heading">
             <span class="step">1</span>
             <div>
-              <h2>XML Lama</h2>
+              <h2>Data Lama</h2>
               <p>Sumber DOI artikel yang akan dikunci.</p>
             </div>
+          </div>
+          <div class="mode-toggle" role="radiogroup" aria-label="Mode data lama">
+            <label>
+              <input type="radio" name="oldInputMode" value="xml" checked />
+              Upload XML lama
+            </label>
+            <label>
+              <input type="radio" name="oldInputMode" value="doi" />
+              Tulis DOI lama
+            </label>
           </div>
           <label class="file-drop" for="oldXmlInput">
             <i data-lucide="file-up"></i>
             <span id="oldFileName">Pilih file XML lama</span>
             <input id="oldXmlInput" type="file" accept=".xml,text/xml,application/xml" disabled />
           </label>
+          <div class="doi-input-panel" id="oldDoiPanel" hidden>
+            <label for="oldDoiInput">DOI lama yang sudah terdaftar di Crossref</label>
+            <textarea
+              id="oldDoiInput"
+              spellcheck="false"
+              placeholder="10.xxxx/artikel-1&#10;10.xxxx/artikel-2"
+              disabled
+            ></textarea>
+            <button class="button secondary" id="lookupDoiButton" type="button" disabled>
+              <i data-lucide="search"></i>
+              Ambil Metadata Crossref
+            </button>
+            <p class="field-help">
+              Tulis satu DOI per baris. Metadata Crossref dipakai untuk
+              membantu pencocokan, sedangkan XML akhir tetap memakai metadata
+              dari XML baru.
+            </p>
+          </div>
           <div id="oldSummary" class="summary muted">Belum ada file.</div>
         </div>
 
