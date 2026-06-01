@@ -250,6 +250,10 @@ textarea {
   color: var(--muted);
 }
 
+.summary.crossref-summary {
+  max-height: 620px;
+}
+
 .summary-header {
   display: flex;
   justify-content: space-between;
@@ -293,6 +297,126 @@ textarea {
   overflow-wrap: anywhere;
   font-family:
     "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+}
+
+.crossref-metadata {
+  margin-top: 10px;
+}
+
+.article-url {
+  display: grid;
+  gap: 4px;
+  margin: 10px 0;
+  border: 1px solid rgba(15, 107, 87, 0.22);
+  border-radius: var(--radius);
+  background: #eff8f2;
+  padding: 10px;
+}
+
+.article-url span:first-child,
+.metadata-grid dt,
+.metadata-block h4 {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.article-url a,
+.metadata-grid a,
+.metadata-block a {
+  color: var(--accent-dark);
+  overflow-wrap: anywhere;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+
+.metadata-empty {
+  color: var(--warn);
+}
+
+.metadata-details {
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+}
+
+.metadata-details summary,
+.raw-metadata summary {
+  cursor: pointer;
+  color: var(--accent-dark);
+  font-weight: 800;
+}
+
+.metadata-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 14px;
+  margin: 10px 0 0;
+}
+
+.metadata-grid div {
+  min-width: 0;
+}
+
+.metadata-grid dt,
+.metadata-grid dd {
+  margin: 0;
+}
+
+.metadata-grid dd {
+  margin-top: 2px;
+  overflow-wrap: anywhere;
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.metadata-block {
+  margin-top: 12px;
+}
+
+.metadata-block h4 {
+  margin: 0 0 6px;
+}
+
+.metadata-block p,
+.metadata-block ul {
+  margin: 0;
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.metadata-block ul {
+  display: grid;
+  gap: 5px;
+  padding-left: 18px;
+}
+
+.metadata-block li {
+  overflow-wrap: anywhere;
+}
+
+.metadata-block li span {
+  display: block;
+  color: var(--muted);
+}
+
+.raw-metadata {
+  margin-top: 12px;
+}
+
+.raw-metadata pre {
+  max-height: 300px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #101711;
+  color: #e9f1e9;
+  padding: 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .mapping-section,
@@ -493,6 +617,10 @@ textarea {
 
   .summary-header {
     flex-direction: column;
+  }
+
+  .metadata-grid {
+    grid-template-columns: 1fr;
   }
 
   .site-footer {

@@ -17,7 +17,8 @@ Data lama dapat diberikan dengan dua cara:
 
 - Upload XML lama Crossref.
 - Tulis DOI lama yang sudah terdaftar di Crossref, lalu aplikasi mengambil
-  metadata ringkas melalui Crossref REST API untuk membantu pencocokan artikel.
+  metadata lengkap melalui Crossref REST API untuk membantu pencocokan artikel,
+  termasuk URL artikel asli dari `resource.primary.URL` jika tersedia.
 
 ## Jalankan Lokal
 
@@ -62,7 +63,7 @@ mengandung elemen tersebut.
 
 1. Upload XML lama.
 2. Atau pilih `Tulis DOI lama`, masukkan satu DOI per baris, lalu klik
-   `Ambil Metadata Crossref`.
+   `Ambil Metadata Lengkap Crossref`.
 3. Upload XML baru.
 4. Aplikasi otomatis membuat XML akhir jika jumlah artikel lama dan baru sama
    serta pemetaan cukup jelas.
@@ -78,8 +79,9 @@ mengandung elemen tersebut.
 - Tidak ada submit otomatis ke Crossref.
 - Mode DOI lama membutuhkan koneksi browser user ke Crossref REST API dan
   mengikuti rate limit publik Crossref.
-- Metadata Crossref REST API dipakai untuk pencocokan saja. XML akhir tetap
-  dibangun dari XML baru agar deposit berisi metadata lengkap.
+- Metadata Crossref REST API ditampilkan lengkap untuk audit dan pencocokan
+  saja. XML akhir tetap dibangun dari XML baru agar deposit berisi metadata
+  lengkap.
 
 ## Hak Cipta dan Lisensi
 

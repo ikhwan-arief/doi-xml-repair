@@ -280,22 +280,57 @@ async function fetchCrossrefWork(doi) {
 
 function articleFromCrossref(work, requestedDoi, index) {
   const title = firstArrayValue(work.title) || "(judul tidak tersedia di Crossref)";
-  const year = yearFromDateParts(
+  const dateSource =
     getNested(work, ["published", "date-parts"]) ||
-      getNested(work, ["issued", "date-parts"]) ||
-      getNested(work, ["published-print", "date-parts"]) ||
-      getNested(work, ["published-online", "date-parts"]),
-  );
+    getNested(work, ["issued", "date-parts"]) ||
+    getNested(work, ["published-print", "date-parts"]) ||
+    getNested(work, ["published-online", "date-parts"]);
+  const year = yearFromDateParts(dateSource);
+  const doi = normalizeDoi(work.DOI || requestedDoi);
   return {
     index,
     number: index + 1,
-    doi: normalizeDoi(work.DOI || requestedDoi),
+    doi,
     title,
+    subtitle: arrayValues(work.subtitle),
     year,
+    published_date: datePartsToString(dateSource),
+    published_print: crossrefDate(work["published-print"]),
+    published_online: crossrefDate(work["published-online"]),
+    created_date: crossrefDate(work.created),
+    deposited_date: crossrefDate(work.deposited),
+    indexed_date: crossrefDate(work.indexed),
     first_page: firstPageFromPage(work.page || ""),
+    page: work.page || "",
+    article_number: work["article-number"] || "",
     container_title: firstArrayValue(work["container-title"]),
+    short_container_title: firstArrayValue(work["short-container-title"]),
+    original_title: arrayValues(work["original-title"]),
     volume: work.volume || "",
     issue: work.issue || getNested(work, ["journal-issue", "issue"]) || "",
+    publisher: work.publisher || "",
+    type: work.type || "",
+    language: work.language || "",
+    prefix: work.prefix || "",
+    member: work.member || "",
+    issn: arrayValues(work.ISSN),
+    issn_type: issnTypes(work["issn-type"]),
+    subject: arrayValues(work.subject),
+    authors: peopleNames(work.author),
+    editors: peopleNames(work.editor),
+    funders: funderNames(work.funder),
+    licenses: licenseLinks(work.license),
+    full_text_links: linkEntries(work.link),
+    relations: relationEntries(work.relation),
+    content_domain: contentDomains(work["content-domain"]),
+    alternative_id: arrayValues(work["alternative-id"]),
+    update_policy: work["update-policy"] || "",
+    abstract: stripMarkup(work.abstract || ""),
+    original_url: getNested(work, ["resource", "primary", "URL"]) || "",
+    doi_url: work.URL || (doi ? `https://doi.org/${doi}` : ""),
+    reference_count: String(work["reference-count"] ?? work["references-count"] ?? ""),
+    cited_by_count: String(work["is-referenced-by-count"] ?? ""),
+    raw_metadata: work,
     source: "crossref",
   };
 }
@@ -326,12 +361,13 @@ function renderDoiSummary(failures = []) {
           <span class="article-title">${escapeHtml(article.number)}. ${escapeHtml(article.title)}</span>
           <div class="doi-code">${escapeHtml(article.doi)}</div>
           <div class="article-meta">${formatCrossrefMeta(article)}</div>
+          ${renderCrossrefDetails(article)}
         </li>
       `,
     )
     .join("");
 
-  els.oldSummary.className = "summary";
+  els.oldSummary.className = "summary crossref-summary";
   els.oldSummary.innerHTML = `
     <div class="summary-header">
       <span>${escapeHtml(state.oldDoiArticles.length)} DOI ditemukan</span>
@@ -604,6 +640,153 @@ function formatCrossrefMeta(article) {
   return parts.join(" - ") || "Metadata Crossref ringkas tidak tersedia";
 }
 
+function renderCrossrefDetails(article) {
+  const originalUrl = article.original_url
+    ? safeExternalLink(article.original_url)
+    : `
+        <span class="metadata-empty">
+          Crossref tidak menyediakan resource.primary.URL.
+          ${article.doi_url ? `DOI resolver: ${safeExternalLink(article.doi_url)}` : ""}
+        </span>
+      `;
+  const rows = [
+    metadataRow("URL artikel asli", article.original_url, { link: true }),
+    metadataRow("DOI resolver", article.doi_url, { link: true }),
+    metadataRow("Penerbit", article.publisher),
+    metadataRow("Tipe record", article.type),
+    metadataRow("Jurnal/prosiding", article.container_title),
+    metadataRow("Judul pendek", article.short_container_title),
+    metadataRow("Judul asli", article.original_title),
+    metadataRow("Subjudul", article.subtitle),
+    metadataRow("Volume", article.volume),
+    metadataRow("Nomor", article.issue),
+    metadataRow("Halaman", article.page),
+    metadataRow("Nomor artikel", article.article_number),
+    metadataRow("Tanggal terbit", article.published_date),
+    metadataRow("Tanggal cetak", article.published_print),
+    metadataRow("Tanggal online", article.published_online),
+    metadataRow("Dibuat di Crossref", article.created_date),
+    metadataRow("Deposit terakhir", article.deposited_date),
+    metadataRow("Index Crossref", article.indexed_date),
+    metadataRow("Bahasa", article.language),
+    metadataRow("ISSN", article.issn),
+    metadataRow("ISSN type", article.issn_type),
+    metadataRow("Prefix", article.prefix),
+    metadataRow("Member ID", article.member),
+    metadataRow("Jumlah referensi", article.reference_count),
+    metadataRow("Disitasi oleh", article.cited_by_count),
+    metadataRow("Update policy", article.update_policy, { link: true }),
+    metadataRow("Alternative ID", article.alternative_id),
+    metadataRow("Content domain", article.content_domain),
+  ].join("");
+  const abstractBlock = article.abstract
+    ? `
+        <div class="metadata-block">
+          <h4>Abstrak</h4>
+          <p>${escapeHtml(article.abstract)}</p>
+        </div>
+      `
+    : "";
+
+  return `
+    <div class="crossref-metadata">
+      <div class="article-url">
+        <span>URL artikel asli</span>
+        ${originalUrl}
+      </div>
+      <details class="metadata-details" open>
+        <summary>Metadata Crossref lengkap</summary>
+        <dl class="metadata-grid">${rows}</dl>
+        ${metadataListBlock("Penulis", article.authors)}
+        ${metadataListBlock("Editor", article.editors)}
+        ${metadataListBlock("Subjek", article.subject)}
+        ${metadataListBlock("Funder", article.funders)}
+        ${metadataUrlListBlock("Lisensi", article.licenses)}
+        ${metadataUrlListBlock("Full-text/TDM links", article.full_text_links)}
+        ${metadataListBlock("Relasi", article.relations)}
+        ${abstractBlock}
+        <details class="raw-metadata">
+          <summary>JSON metadata lengkap dari Crossref</summary>
+          <pre>${escapeHtml(JSON.stringify(article.raw_metadata, null, 2))}</pre>
+        </details>
+      </details>
+    </div>
+  `;
+}
+
+function metadataRow(label, value, options = {}) {
+  const normalized = normalizeDisplayValue(value);
+  if (!normalized) return "";
+  const content = options.link
+    ? safeExternalLink(normalized)
+    : escapeHtml(normalized);
+  return `
+    <div>
+      <dt>${escapeHtml(label)}</dt>
+      <dd>${content}</dd>
+    </div>
+  `;
+}
+
+function metadataListBlock(label, values) {
+  const items = normalizeDisplayList(values);
+  if (!items.length) return "";
+  return `
+    <div class="metadata-block">
+      <h4>${escapeHtml(label)}</h4>
+      <ul>
+        ${items.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}
+      </ul>
+    </div>
+  `;
+}
+
+function metadataUrlListBlock(label, entries) {
+  const items = Array.isArray(entries) ? entries.filter((entry) => entry.url) : [];
+  if (!items.length) return "";
+  return `
+    <div class="metadata-block">
+      <h4>${escapeHtml(label)}</h4>
+      <ul>
+        ${items
+          .map(
+            (entry) => `
+              <li>
+                ${safeExternalLink(entry.url)}
+                ${entry.note ? `<span>${escapeHtml(entry.note)}</span>` : ""}
+              </li>
+            `,
+          )
+          .join("")}
+      </ul>
+    </div>
+  `;
+}
+
+function safeExternalLink(url) {
+  const text = String(url || "").trim();
+  if (!text) return "";
+  if (!/^https?:\/\//i.test(text)) {
+    return escapeHtml(text);
+  }
+  return `<a href="${escapeHtml(text)}" target="_blank" rel="noopener noreferrer">${escapeHtml(text)}</a>`;
+}
+
+function normalizeDisplayValue(value) {
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item || "").trim()).filter(Boolean).join(", ");
+  }
+  return String(value || "").trim();
+}
+
+function normalizeDisplayList(values) {
+  if (!Array.isArray(values)) {
+    const value = normalizeDisplayValue(values);
+    return value ? [value] : [];
+  }
+  return values.map((item) => String(item || "").trim()).filter(Boolean);
+}
+
 function currentOldArticles() {
   if (state.oldMode === "doi") {
     return state.oldDoiArticles;
@@ -630,13 +813,113 @@ function firstArrayValue(value) {
   return Array.isArray(value) && value.length ? String(value[0]) : "";
 }
 
+function arrayValues(value) {
+  return Array.isArray(value)
+    ? value.map((item) => String(item || "").trim()).filter(Boolean)
+    : [];
+}
+
 function yearFromDateParts(dateParts) {
   if (!Array.isArray(dateParts) || !Array.isArray(dateParts[0])) return "";
   return dateParts[0][0] ? String(dateParts[0][0]) : "";
 }
 
+function datePartsToString(dateParts) {
+  if (!Array.isArray(dateParts) || !Array.isArray(dateParts[0])) return "";
+  return dateParts[0]
+    .filter((part) => part !== undefined && part !== null && part !== "")
+    .map((part, index) => String(part).padStart(index === 0 ? 4 : 2, "0"))
+    .join("-");
+}
+
+function crossrefDate(value) {
+  if (!value) return "";
+  if (value["date-time"]) return String(value["date-time"]).split("T")[0];
+  return datePartsToString(value["date-parts"]);
+}
+
 function firstPageFromPage(page) {
   return String(page || "").split(/[-\u2013\u2014]/)[0].trim();
+}
+
+function peopleNames(people) {
+  if (!Array.isArray(people)) return [];
+  return people.map((person) => {
+    const name = [person.given, person.family].filter(Boolean).join(" ");
+    const fallback = person.name || person.family || person.given || "";
+    const orcid = person.ORCID ? ` (${person.ORCID})` : "";
+    return `${name || fallback}${orcid}`.trim();
+  }).filter(Boolean);
+}
+
+function funderNames(funders) {
+  if (!Array.isArray(funders)) return [];
+  return funders.map((funder) => {
+    const awards = Array.isArray(funder.award) && funder.award.length
+      ? `; award: ${funder.award.join(", ")}`
+      : "";
+    const doi = funder.DOI ? ` (${funder.DOI})` : "";
+    return `${funder.name || ""}${doi}${awards}`.trim();
+  }).filter(Boolean);
+}
+
+function licenseLinks(licenses) {
+  if (!Array.isArray(licenses)) return [];
+  return licenses.map((license) => ({
+    url: license.URL || "",
+    note: [
+      license["content-version"],
+      license["delay-in-days"] !== undefined
+        ? `delay ${license["delay-in-days"]} hari`
+        : "",
+      crossrefDate(license.start),
+    ].filter(Boolean).join(" - "),
+  }));
+}
+
+function linkEntries(links) {
+  if (!Array.isArray(links)) return [];
+  return links.map((link) => ({
+    url: link.URL || "",
+    note: [
+      link["content-type"],
+      link["content-version"],
+      link["intended-application"],
+    ].filter(Boolean).join(" - "),
+  }));
+}
+
+function issnTypes(types) {
+  if (!Array.isArray(types)) return [];
+  return types.map((item) => [item.value, item.type].filter(Boolean).join(" - "));
+}
+
+function relationEntries(relation) {
+  if (!relation || typeof relation !== "object") return [];
+  return Object.entries(relation).map(([type, entries]) => {
+    const ids = Array.isArray(entries)
+      ? entries
+          .map((entry) => [entry["id-type"], entry.id].filter(Boolean).join(": "))
+          .filter(Boolean)
+      : [];
+    return `${type}: ${ids.join(", ")}`.trim();
+  }).filter((entry) => !entry.endsWith(":"));
+}
+
+function contentDomains(contentDomain) {
+  if (!contentDomain || typeof contentDomain !== "object") return [];
+  const domains = Array.isArray(contentDomain.domain) ? contentDomain.domain : [];
+  const restriction = contentDomain["crossmark-restriction"] === true
+    ? "crossmark restricted"
+    : "";
+  return [...domains, restriction].filter(Boolean);
+}
+
+function stripMarkup(value) {
+  return String(value || "")
+    .replace(/<\/?[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function pickOldArticleIndex(newArticle, oldArticles, fallbackIndex) {
