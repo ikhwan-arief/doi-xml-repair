@@ -45,6 +45,13 @@ browser.
 Semua pemrosesan berjalan di browser user lewat Pyodide CDN. File XML yang
 diupload tidak dikirim ke server dan tidak disimpan aplikasi.
 
+## Kompatibilitas Browser
+
+Aplikasi ditujukan untuk browser modern yang mendukung WebAssembly dan
+`fetch()`, termasuk Microsoft Edge, Chrome, Firefox, Safari, dan browser mobile
+terbaru. UI dibuat responsif untuk layar ponsel, dengan fallback pembacaan file
+dan download agar tetap berjalan pada variasi browser yang lebih luas.
+
 Crossref meminta update bibliographic metadata dikirim sebagai metadata record
 lengkap, bukan hanya field yang berubah. Karena itu XML baru harus sudah berisi
 metadata lengkap yang ingin dipertahankan. Crossmark dan relationship metadata

@@ -137,7 +137,7 @@ async function handleFileChange(kind) {
   const input = kind === "old" ? els.oldXmlInput : els.newXmlInput;
   const fileName = kind === "old" ? els.oldFileName : els.newFileName;
   const summary = kind === "old" ? els.oldSummary : els.newSummary;
-  const file = input.files?.[0];
+  const file = input.files && input.files.length ? input.files[0] : null;
 
   clearOutput();
   if (!file) {
@@ -158,7 +158,7 @@ async function handleFileChange(kind) {
 
   fileName.textContent = file.name;
   try {
-    const xmlText = await file.text();
+    const xmlText = await readFileAsText(file);
     const analysis = JSON.parse(state.analyzeXml(xmlText));
     if (kind === "old") {
       state.oldText = xmlText;
@@ -183,7 +183,7 @@ async function handleFileChange(kind) {
 }
 
 function renderSummary(container, analysis) {
-  const warnings = analysis.warnings?.length
+  const warnings = analysis.warnings && analysis.warnings.length
     ? `<div class="notice warn">${escapeHtml(analysis.warnings.join(" "))}</div>`
     : "";
   const articles = analysis.articles
@@ -281,10 +281,10 @@ async function fetchCrossrefWork(doi) {
 function articleFromCrossref(work, requestedDoi, index) {
   const title = firstArrayValue(work.title) || "(judul tidak tersedia di Crossref)";
   const year = yearFromDateParts(
-    work.published?.["date-parts"] ||
-      work.issued?.["date-parts"] ||
-      work["published-print"]?.["date-parts"] ||
-      work["published-online"]?.["date-parts"],
+    getNested(work, ["published", "date-parts"]) ||
+      getNested(work, ["issued", "date-parts"]) ||
+      getNested(work, ["published-print", "date-parts"]) ||
+      getNested(work, ["published-online", "date-parts"]),
   );
   return {
     index,
@@ -295,7 +295,7 @@ function articleFromCrossref(work, requestedDoi, index) {
     first_page: firstPageFromPage(work.page || ""),
     container_title: firstArrayValue(work["container-title"]),
     volume: work.volume || "",
-    issue: work.issue || work["journal-issue"]?.issue || "",
+    issue: work.issue || getNested(work, ["journal-issue", "issue"]) || "",
     source: "crossref",
   };
 }
@@ -344,7 +344,7 @@ function renderDoiSummary(failures = []) {
 
 function renderMapping() {
   const oldArticles = currentOldArticles();
-  const newArticles = state.newAnalysis?.articles || [];
+  const newArticles = state.newAnalysis ? state.newAnalysis.articles : [];
   els.mappingBody.innerHTML = "";
   els.mappingTable.hidden = true;
   els.generateButton.disabled = true;
@@ -353,7 +353,7 @@ function renderMapping() {
     const message =
       state.oldMode === "doi"
         ? "Ambil metadata DOI lama dari Crossref, lalu upload XML baru."
-        : "Upload kedua XML untuk membuat XML akhir.";
+        : "Upload XML lama dan XML baru untuk membuat XML akhir.";
     setNotice(els.mappingStatus, message, "");
     return;
   }
@@ -380,13 +380,13 @@ function renderMapping() {
     doi.textContent = `DOI pada XML baru: ${newArticle.doi}`;
 
     select.dataset.newIndex = String(index);
-    select.append(new Option("Pilih DOI lama", ""));
+    select.appendChild(new Option("Pilih DOI lama", ""));
     oldArticles.forEach((oldArticle, oldIndex) => {
       const option = new Option(
         `${oldArticle.number}. ${oldArticle.doi} - ${oldArticle.title}`,
         String(oldIndex),
       );
-      select.append(option);
+      select.appendChild(option);
     });
     const picked = pickOldArticleIndex(newArticle, oldArticles, index);
     select.value = picked.value;
@@ -397,10 +397,12 @@ function renderMapping() {
       validateMapping();
     });
 
-    titleCell.append(title, doi);
-    selectCell.append(select);
-    tr.append(titleCell, selectCell);
-    els.mappingBody.append(tr);
+    titleCell.appendChild(title);
+    titleCell.appendChild(doi);
+    selectCell.appendChild(select);
+    tr.appendChild(titleCell);
+    tr.appendChild(selectCell);
+    els.mappingBody.appendChild(tr);
   });
 
   els.mappingTable.hidden = false;
@@ -498,14 +500,16 @@ function generateXml(options = {}) {
     els.xmlOutput.value = result.xml;
     els.copyButton.disabled = false;
     els.downloadButton.disabled = false;
-    const warningText = result.warnings?.length ? ` ${result.warnings.join(" ")}` : "";
+    const warningText = result.warnings && result.warnings.length
+      ? ` ${result.warnings.join(" ")}`
+      : "";
     const prefix = options.auto
       ? "XML akhir dibuat otomatis."
       : "XML berhasil dibuat.";
     setNotice(
       els.outputInfo,
       `${prefix} ${result.article_count} artikel memakai DOI lama. Timestamp dinaikkan untuk update Crossref: ${result.timestamp}.${warningText}`,
-      result.warnings?.length ? "warn" : "success",
+      result.warnings && result.warnings.length ? "warn" : "success",
     );
   } catch (error) {
     setNotice(els.outputInfo, cleanError(error), "error");
@@ -526,15 +530,23 @@ async function copyOutput() {
 
 function downloadOutput() {
   if (!state.outputXml) return;
+  const filename = `crossref-doi-repair-${timestampForFile()}.xml`;
   const blob = new Blob([state.outputXml], { type: "application/xml;charset=utf-8" });
+  if (window.navigator && window.navigator.msSaveOrOpenBlob) {
+    window.navigator.msSaveOrOpenBlob(blob, filename);
+    return;
+  }
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;
-  anchor.download = `crossref-doi-repair-${timestampForFile()}.xml`;
-  document.body.append(anchor);
+  anchor.download = filename;
+  anchor.target = "_blank";
+  document.body.appendChild(anchor);
   anchor.click();
-  anchor.remove();
-  URL.revokeObjectURL(url);
+  if (anchor.parentNode) {
+    anchor.parentNode.removeChild(anchor);
+  }
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 function resetApp() {
@@ -565,7 +577,7 @@ function clearOutput() {
   els.downloadButton.disabled = true;
   setNotice(
     els.outputInfo,
-    "Output akan dibuat otomatis setelah kedua XML diupload.",
+    "Output akan dibuat otomatis setelah data lama dan XML baru siap.",
     "",
   );
 }
@@ -596,7 +608,7 @@ function currentOldArticles() {
   if (state.oldMode === "doi") {
     return state.oldDoiArticles;
   }
-  return state.oldAnalysis?.articles || [];
+  return state.oldAnalysis ? state.oldAnalysis.articles : [];
 }
 
 function parseDoiLines(value) {
@@ -624,7 +636,7 @@ function yearFromDateParts(dateParts) {
 }
 
 function firstPageFromPage(page) {
-  return String(page || "").split(/[-–—]/)[0].trim();
+  return String(page || "").split(/[-\u2013\u2014]/)[0].trim();
 }
 
 function pickOldArticleIndex(newArticle, oldArticles, fallbackIndex) {
@@ -716,7 +728,7 @@ function wait(ms) {
 }
 
 function cleanError(error) {
-  const message = String(error?.message || error || "Terjadi kesalahan.");
+  const message = String((error && error.message) || error || "Terjadi kesalahan.");
   return message
     .replace(/^PythonError:\s*/, "")
     .replace(/Traceback[\s\S]*?XmlRepairError:\s*/m, "")
@@ -724,12 +736,36 @@ function cleanError(error) {
 }
 
 function escapeHtml(value) {
-  return String(value ?? "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
+  return String(value === null || value === undefined ? "" : value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+function readFileAsText(file) {
+  if (file && typeof file.text === "function") {
+    return file.text();
+  }
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = () => reject(reader.error || new Error("File tidak dapat dibaca."));
+    reader.readAsText(file);
+  });
+}
+
+function getNested(source, path) {
+  let value = source;
+  path.forEach((key) => {
+    if (value && Object.prototype.hasOwnProperty.call(value, key)) {
+      value = value[key];
+    } else {
+      value = undefined;
+    }
+  });
+  return value;
 }
 
 function timestampForFile() {
