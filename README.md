@@ -61,20 +61,14 @@ metadata lengkap yang ingin dipertahankan. Crossmark dan relationship metadata
 memiliki aturan update khusus di dokumentasi Crossref; cek manual jika record
 mengandung elemen tersebut.
 
-## Alur Penggunaan
+## Quick Start Guide
 
-1. Upload XML lama.
-2. Atau pilih `Tulis DOI lama`, masukkan satu DOI per baris, lalu klik
-   `Ambil Metadata Lengkap Crossref`.
-3. Upload XML baru.
-4. Pilih sumber URL artikel output: pakai URL dari XML baru, atau pilih
-   `Tulis URL baru` lalu isi satu URL per baris sesuai urutan artikel pada XML
-   baru.
-5. Aplikasi otomatis membuat XML akhir jika jumlah artikel lama dan baru sama
-   serta pemetaan cukup jelas.
-6. Jika perlu, koreksi pemetaan artikel di tabel lalu klik `Generate Ulang`.
-7. Cek ringkasan DOI dan URL artikel yang dipakai, lalu copy XML dari layar
-   atau download sebagai file `.xml`.
+1. **Step 1 (Old Data):** Upload your old Crossref XML file, or select **Enter old DOIs** to paste one DOI per line and click **Fetch Full Crossref Metadata**.
+2. **Step 2 (New XML):** Upload your new Crossref XML file containing the updated metadata.
+3. **Configure URL Output:** Choose to **Use URL from new XML** or **Enter new URLs** manually (one URL per line in the order of the new XML).
+4. **DOI Mapping:** The tool automatically maps new articles to old DOIs based on title similarity. If the counts differ or you want to correct any pairs, adjust the mapping dropdowns manually.
+5. **Generate Output:** The final XML is generated automatically if mapping is clear. Click **Regenerate** to update if you manually change any dropdown values.
+6. **Export XML:** Review the summary of applied DOIs and URLs, then click **Copy** or **Download** to obtain your repaired Crossref XML file.
 
 ## Batasan V1
 

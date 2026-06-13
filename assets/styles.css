@@ -898,6 +898,53 @@ select:focus {
   margin: 0;
 }
 
+/* Collapsible Quick Start Guide Card */
+.instructions-card {
+  border: 1px solid var(--color-pearl-border);
+  border-radius: var(--radius-cards);
+  background-color: var(--color-pure-white);
+  box-shadow: var(--shadow-md);
+  padding: var(--spacing-24);
+  margin-bottom: var(--spacing-32);
+}
+
+.instructions-card summary {
+  font-family: var(--font-roobert);
+  font-size: var(--text-subheading);
+  font-weight: 500;
+  color: var(--color-stone-ink);
+  cursor: pointer;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-8);
+  outline: none;
+}
+
+.instructions-card summary::-webkit-details-marker {
+  color: var(--color-signal-blue);
+}
+
+.instructions-card[open] summary {
+  border-bottom: 1px solid var(--color-pearl-border);
+  padding-bottom: var(--spacing-12);
+  margin-bottom: var(--spacing-16);
+}
+
+.instructions-card ol {
+  margin: 0;
+  padding-left: var(--spacing-20);
+  display: grid;
+  gap: var(--spacing-12);
+  color: var(--color-warm-slate);
+  font-size: var(--text-body-sm);
+  line-height: 1.6;
+}
+
+.instructions-card li strong {
+  color: var(--color-stone-ink);
+}
+
 /* Responsiveness adjustments */
 @media (max-width: 900px) {
   .app-nav {
