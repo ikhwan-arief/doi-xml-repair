@@ -81,7 +81,7 @@ async function bootPython() {
     state.pyodide = await loadPyodide();
     const response = await fetch("doi_xml_repair.py", { cache: "no-store" });
     if (!response.ok) {
-      throw new Error("doi_xml_repair.py tidak dapat dimuat.");
+      throw new Error("doi_xml_repair.py could not be loaded.");
     }
     const pythonCode = await response.text();
     await state.pyodide.runPythonAsync(pythonCode);
@@ -95,7 +95,7 @@ async function bootPython() {
   } catch (error) {
     setNotice(
       els.mappingStatus,
-      `Runtime Python gagal dimuat: ${cleanError(error)}`,
+      `Python runtime failed to load: ${cleanError(error)}`,
       "error",
     );
   }
@@ -121,7 +121,7 @@ function setOldMode(mode) {
     els.lookupDoiButton.disabled = true;
     if (!state.oldAnalysis) {
       els.oldSummary.className = "summary muted";
-      els.oldSummary.textContent = "Belum ada file.";
+      els.oldSummary.textContent = "No file selected.";
     } else {
       renderSummary(els.oldSummary, state.oldAnalysis);
     }
@@ -129,7 +129,7 @@ function setOldMode(mode) {
     state.oldText = "";
     state.oldAnalysis = null;
     els.oldXmlInput.value = "";
-    els.oldFileName.textContent = "Pilih file XML lama";
+    els.oldFileName.textContent = "Select old XML file";
     renderDoiSummary();
   }
   renderMapping();
@@ -179,14 +179,14 @@ async function handleFileChange(kind) {
     if (kind === "old") {
       state.oldText = "";
       state.oldAnalysis = null;
-      fileName.textContent = "Pilih file XML lama";
+      fileName.textContent = "Select old XML file";
     } else {
       state.newText = "";
       state.newAnalysis = null;
-      fileName.textContent = "Pilih file XML baru";
+      fileName.textContent = "Select new XML file";
     }
     summary.className = "summary muted";
-    summary.textContent = "Belum ada file.";
+    summary.textContent = "No file selected.";
     renderMapping();
     return;
   }
@@ -236,7 +236,7 @@ function renderSummary(container, analysis) {
   container.className = "summary";
   container.innerHTML = `
     <div class="summary-header">
-      <span>${escapeHtml(analysis.article_count)} artikel</span>
+      <span>${escapeHtml(analysis.article_count)} articles</span>
       <span>Timestamp: ${escapeHtml(analysis.timestamp || "-")}</span>
     </div>
     ${warnings}
@@ -248,14 +248,14 @@ async function lookupOldDois() {
   const dois = parseDoiLines(state.oldDoiText);
   clearOutput();
   if (!dois.length) {
-    setNotice(els.oldSummary, "Tulis minimal satu DOI lama.", "warn");
+    setNotice(els.oldSummary, "Enter at least one old DOI.", "warn");
     return;
   }
   const duplicateDois = dois.filter((doi, index) => dois.indexOf(doi) !== index);
   if (duplicateDois.length) {
     state.oldDoiArticles = [];
     renderDoiSummary([
-      `DOI lama tidak boleh ditulis lebih dari sekali: ${[...new Set(duplicateDois)].join(", ")}.`,
+      `Old DOIs cannot be entered more than once: ${[...new Set(duplicateDois)].join(", ")}.`,
     ]);
     renderMapping();
     return;
@@ -264,7 +264,7 @@ async function lookupOldDois() {
   els.lookupDoiButton.disabled = true;
   setNotice(
     els.oldSummary,
-    `Mengambil metadata ${dois.length} DOI dari Crossref...`,
+    `Fetching metadata for ${dois.length} DOIs from Crossref...`,
     "",
   );
 
@@ -301,13 +301,13 @@ async function fetchCrossrefWork(doi) {
     },
   });
   if (response.status === 404) {
-    throw new Error("DOI tidak ditemukan di Crossref.");
+    throw new Error("DOI not found at Crossref.");
   }
   if (response.status === 429) {
-    throw new Error("Rate limit Crossref tercapai. Coba ulang beberapa saat lagi.");
+    throw new Error("Crossref rate limit reached. Please try again in a few moments.");
   }
   if (!response.ok) {
-    throw new Error(`Crossref mengembalikan status ${response.status}.`);
+    throw new Error(`Crossref returned status ${response.status}.`);
   }
   const payload = await response.json();
   return payload.message;
@@ -376,13 +376,13 @@ function renderDoiSummary(failures = []) {
 
   if (!pendingDois.length) {
     els.oldSummary.className = "summary muted";
-    els.oldSummary.textContent = "Belum ada DOI.";
+    els.oldSummary.textContent = "No DOIs entered.";
     return;
   }
 
   if (!state.oldDoiArticles.length && !failures.length) {
     els.oldSummary.className = "summary muted";
-    els.oldSummary.textContent = `${pendingDois.length} DOI siap dicek ke Crossref.`;
+    els.oldSummary.textContent = `${pendingDois.length} DOIs ready to fetch from Crossref.`;
     return;
   }
 
@@ -405,8 +405,8 @@ function renderDoiSummary(failures = []) {
   els.oldSummary.className = "summary crossref-summary";
   els.oldSummary.innerHTML = `
     <div class="summary-header">
-      <span>${escapeHtml(state.oldDoiArticles.length)} DOI ditemukan</span>
-      <span>Sumber: Crossref REST API</span>
+      <span>${escapeHtml(state.oldDoiArticles.length)} DOIs found</span>
+      <span>Source: Crossref REST API</span>
     </div>
     ${warnings}
     <ul class="article-list">${articles}</ul>
@@ -423,8 +423,8 @@ function renderMapping() {
   if (!oldArticles.length || !state.newAnalysis) {
     const message =
       state.oldMode === "doi"
-        ? "Ambil metadata DOI lama dari Crossref, lalu upload XML baru."
-        : "Upload XML lama dan XML baru untuk membuat XML akhir.";
+        ? "Fetch old DOI metadata from Crossref, then upload the new XML."
+        : "Upload both old and new XML files to generate the final XML.";
     setNotice(els.mappingStatus, message, "");
     return;
   }
@@ -432,9 +432,9 @@ function renderMapping() {
   const warnings = [];
   const urlValidation = validateNewArticleUrls();
   if (oldArticles.length !== newArticles.length) {
-    const oldLabel = state.oldMode === "doi" ? "DOI lama" : "XML lama";
+    const oldLabel = state.oldMode === "doi" ? "Old DOI" : "Old XML";
     warnings.push(
-      `Jumlah artikel berbeda: ${oldLabel} ${oldArticles.length}, XML baru ${newArticles.length}.`,
+      `Different number of articles: ${oldLabel} has ${oldArticles.length}, new XML has ${newArticles.length}.`,
     );
   }
   if (!urlValidation.valid) {
@@ -453,12 +453,12 @@ function renderMapping() {
     title.className = "article-title";
     title.textContent = `${newArticle.number}. ${newArticle.title}`;
     doi.className = "doi-code";
-    doi.textContent = `DOI pada XML baru: ${newArticle.doi}`;
+    doi.textContent = `DOI in new XML: ${newArticle.doi}`;
     resource.className = "doi-code";
     resource.textContent = articleResourceLabel(newArticle, urlValidation.urls[index]);
 
     select.dataset.newIndex = String(index);
-    select.appendChild(new Option("Pilih DOI lama", ""));
+    select.appendChild(new Option("Select old DOI", ""));
     oldArticles.forEach((oldArticle, oldIndex) => {
       const option = new Option(
         `${oldArticle.number}. ${oldArticle.doi} - ${oldArticle.title}`,
@@ -490,7 +490,7 @@ function renderMapping() {
   } else {
     setNotice(
       els.mappingStatus,
-      "Output dibuat otomatis berdasarkan urutan artikel. Ubah pemetaan jika perlu.",
+      "Output is generated automatically based on article order. Modify mapping if needed.",
       "success",
     );
   }
@@ -526,13 +526,13 @@ function validateMapping() {
   if (hasDuplicate) {
     setNotice(
       els.mappingStatus,
-      "Satu DOI lama tidak boleh dipakai lebih dari sekali.",
+      "An old DOI cannot be mapped more than once.",
       "error",
     );
   } else if (!complete && currentOldArticles().length && state.newAnalysis) {
     setNotice(
       els.mappingStatus,
-      "Semua artikel baru harus dipasangkan dengan DOI lama.",
+      "All new articles must be mapped to an old DOI.",
       "warn",
     );
   } else if (!urlValidation.valid && currentOldArticles().length && state.newAnalysis) {
@@ -543,12 +543,12 @@ function validateMapping() {
     let type = oldCount === newCount ? "success" : "warn";
     let message =
       oldCount === newCount
-        ? "Pemetaan valid. XML siap dibuat."
-        : `Pemetaan valid, tetapi jumlah artikel berbeda: lama ${oldCount}, baru ${newCount}.`;
+        ? "Mapping is valid. XML ready to generate."
+        : `Mapping is valid, but the number of articles differs: old ${oldCount}, new ${newCount}.`;
     if (state.oldMode === "doi" && !hasHighConfidenceMapping()) {
       type = "warn";
       message =
-        "Pemetaan DOI dari Crossref perlu diperiksa. Jika pasangan artikel sudah benar, klik Generate Ulang.";
+        "DOI mapping from Crossref needs verification. If the matching is correct, click Regenerate.";
     }
     setNotice(els.mappingStatus, message, type);
   }
@@ -596,14 +596,14 @@ function generateXml(options = {}) {
       ? ` ${result.warnings.join(" ")}`
       : "";
     const prefix = options.auto
-      ? "XML akhir dibuat otomatis."
-      : "XML berhasil dibuat.";
+      ? "Final XML generated automatically."
+      : "XML generated successfully.";
     const resourceText = result.resource_url_override_count
-      ? ` ${result.resource_url_override_count} URL artikel baru dipakai untuk doi_data/resource.`
+      ? ` ${result.resource_url_override_count} new article URLs applied to doi_data/resource.`
       : "";
     setNotice(
       els.outputInfo,
-      `${prefix} ${result.article_count} artikel memakai DOI lama. Timestamp dinaikkan untuk update Crossref: ${result.timestamp}.${resourceText}${warningText}`,
+      `${prefix} ${result.article_count} articles memakai Old DOI. Timestamp dinaikkan untuk update Crossref: ${result.timestamp}.${resourceText}${warningText}`,
       result.warnings && result.warnings.length ? "warn" : "success",
     );
   } catch (error) {
@@ -615,11 +615,11 @@ async function copyOutput() {
   if (!state.outputXml) return;
   try {
     await navigator.clipboard.writeText(state.outputXml);
-    setNotice(els.outputInfo, "XML berhasil disalin ke clipboard.", "success");
+    setNotice(els.outputInfo, "XML copied to clipboard successfully.", "success");
   } catch (_error) {
     els.xmlOutput.select();
     document.execCommand("copy");
-    setNotice(els.outputInfo, "XML disalin dari area teks.", "success");
+    setNotice(els.outputInfo, "XML copied from textarea.", "success");
   }
 }
 
@@ -659,12 +659,12 @@ function resetApp() {
   els.lookupDoiButton.disabled = true;
   els.newXmlInput.value = "";
   els.newUrlInput.value = "";
-  els.oldFileName.textContent = "Pilih file XML lama";
-  els.newFileName.textContent = "Pilih file XML baru";
+  els.oldFileName.textContent = "Select old XML file";
+  els.newFileName.textContent = "Select new XML file";
   els.oldSummary.className = "summary muted";
   els.newSummary.className = "summary muted";
-  els.oldSummary.textContent = "Belum ada file.";
-  els.newSummary.textContent = "Belum ada file.";
+  els.oldSummary.textContent = "No file selected.";
+  els.newSummary.textContent = "No file selected.";
   setNewResourceMode("xml", { clear: false });
   setOldMode("xml");
 }
@@ -678,7 +678,7 @@ function clearOutput() {
   els.outputResourceSummary.innerHTML = "";
   setNotice(
     els.outputInfo,
-    "Output akan dibuat otomatis setelah data lama dan XML baru siap.",
+    "Output will be generated automatically once old data and new XML are ready.",
     "",
   );
 }
@@ -690,20 +690,20 @@ function setNotice(element, message, type) {
 
 function formatMeta(article) {
   const parts = [];
-  if (article.year) parts.push(`Tahun ${article.year}`);
-  if (article.first_page) parts.push(`Hal. ${article.first_page}`);
+  if (article.year) parts.push(`Year ${article.year}`);
+  if (article.first_page) parts.push(`Page ${article.first_page}`);
   if (article.resource_url) parts.push(`URL: ${article.resource_url}`);
-  return parts.join(" - ") || "Metadata ringkas tidak tersedia";
+  return parts.join(" - ") || "Summary metadata not available";
 }
 
 function formatCrossrefMeta(article) {
   const parts = [];
   if (article.container_title) parts.push(article.container_title);
-  if (article.year) parts.push(`Tahun ${article.year}`);
+  if (article.year) parts.push(`Year ${article.year}`);
   if (article.volume) parts.push(`Vol. ${article.volume}`);
   if (article.issue) parts.push(`No. ${article.issue}`);
-  if (article.first_page) parts.push(`Hal. ${article.first_page}`);
-  return parts.join(" - ") || "Metadata Crossref ringkas tidak tersedia";
+  if (article.first_page) parts.push(`Page ${article.first_page}`);
+  return parts.join(" - ") || "Crossref summary metadata not available";
 }
 
 function renderOutputResourceSummary(mapping) {
@@ -714,14 +714,14 @@ function renderOutputResourceSummary(mapping) {
   }
   els.outputResourceSummary.hidden = false;
   els.outputResourceSummary.innerHTML = `
-    <h3>DOI dan URL artikel yang dipakai</h3>
+    <h3>DOIs and URLs to be applied</h3>
     <ul>
       ${mapping
         .map(
           (item) => `
             <li>
               <span class="doi-code">${escapeHtml(item.doi)}</span>
-              <span>${safeExternalLink(item.resource_url || "") || "URL artikel kosong"}</span>
+              <span>${safeExternalLink(item.resource_url || "") || "Article URL is empty"}</span>
             </li>
           `,
         )
@@ -732,12 +732,12 @@ function renderOutputResourceSummary(mapping) {
 
 function articleResourceLabel(article, overrideUrl) {
   if (overrideUrl) {
-    return `URL output dari input: ${overrideUrl}`;
+    return `Output URL from input: ${overrideUrl}`;
   }
   if (article.resource_url) {
-    return `URL output dari XML baru: ${article.resource_url}`;
+    return `Output URL from new XML: ${article.resource_url}`;
   }
-  return "URL output belum tersedia di XML baru.";
+  return "Output URL is not yet available in the new XML.";
 }
 
 function validateNewArticleUrls() {
@@ -752,7 +752,7 @@ function validateNewArticleUrls() {
     return {
       valid: false,
       urls,
-      message: "Mode URL manual dipilih. Tulis URL artikel baru satu URL per artikel, atau pilih Pakai URL dari XML baru.",
+      message: "Manual URL mode selected. Enter new article website URLs (one per line), or choose Use URL from new XML.",
     };
   }
   if (!state.newAnalysis) {
@@ -763,7 +763,7 @@ function validateNewArticleUrls() {
     return {
       valid: false,
       urls,
-      message: `Jumlah URL artikel baru harus sama dengan jumlah artikel XML baru: ${urls.length} URL untuk ${expectedCount} artikel.`,
+      message: `Number of new URLs must match the number of new XML articles: ${urls.length} URLs for ${expectedCount} articles.`,
     };
   }
 
@@ -775,7 +775,7 @@ function validateNewArticleUrls() {
     return {
       valid: false,
       urls,
-      message: `URL artikel baru harus diawali http:// atau https://. Baris: ${invalidLines.join(", ")}.`,
+      message: `New article URLs must start with http:// or https://. Lines: ${invalidLines.join(", ")}.`,
     };
   }
 
@@ -787,36 +787,36 @@ function renderCrossrefDetails(article) {
     ? safeExternalLink(article.original_url)
     : `
         <span class="metadata-empty">
-          Crossref tidak menyediakan resource.primary.URL.
+          Crossref did not provide resource.primary.URL.
           ${article.doi_url ? `DOI resolver: ${safeExternalLink(article.doi_url)}` : ""}
         </span>
       `;
   const rows = [
-    metadataRow("URL artikel asli", article.original_url, { link: true }),
+    metadataRow("Original article URL", article.original_url, { link: true }),
     metadataRow("DOI resolver", article.doi_url, { link: true }),
     metadataRow("Penerbit", article.publisher),
     metadataRow("Tipe record", article.type),
     metadataRow("Jurnal/prosiding", article.container_title),
     metadataRow("Judul pendek", article.short_container_title),
-    metadataRow("Judul asli", article.original_title),
-    metadataRow("Subjudul", article.subtitle),
+    metadataRow("Original title", article.original_title),
+    metadataRow("Subtitle", article.subtitle),
     metadataRow("Volume", article.volume),
-    metadataRow("Nomor", article.issue),
-    metadataRow("Halaman", article.page),
-    metadataRow("Nomor artikel", article.article_number),
-    metadataRow("Tanggal terbit", article.published_date),
-    metadataRow("Tanggal cetak", article.published_print),
-    metadataRow("Tanggal online", article.published_online),
-    metadataRow("Dibuat di Crossref", article.created_date),
-    metadataRow("Deposit terakhir", article.deposited_date),
-    metadataRow("Index Crossref", article.indexed_date),
-    metadataRow("Bahasa", article.language),
+    metadataRow("Issue", article.issue),
+    metadataRow("Page", article.page),
+    metadataRow("Issue articles", article.article_number),
+    metadataRow("Publication date", article.published_date),
+    metadataRow("Print date", article.published_print),
+    metadataRow("Online date", article.published_online),
+    metadataRow("Created at Crossref", article.created_date),
+    metadataRow("Last deposit", article.deposited_date),
+    metadataRow("Crossref index", article.indexed_date),
+    metadataRow("Language", article.language),
     metadataRow("ISSN", article.issn),
     metadataRow("ISSN type", article.issn_type),
     metadataRow("Prefix", article.prefix),
     metadataRow("Member ID", article.member),
-    metadataRow("Jumlah referensi", article.reference_count),
-    metadataRow("Disitasi oleh", article.cited_by_count),
+    metadataRow("Reference count", article.reference_count),
+    metadataRow("Cited by", article.cited_by_count),
     metadataRow("Update policy", article.update_policy, { link: true }),
     metadataRow("Alternative ID", article.alternative_id),
     metadataRow("Content domain", article.content_domain),
@@ -824,7 +824,7 @@ function renderCrossrefDetails(article) {
   const abstractBlock = article.abstract
     ? `
         <div class="metadata-block">
-          <h4>Abstrak</h4>
+          <h4>Abstract</h4>
           <p>${escapeHtml(article.abstract)}</p>
         </div>
       `
@@ -833,22 +833,22 @@ function renderCrossrefDetails(article) {
   return `
     <div class="crossref-metadata">
       <div class="article-url">
-        <span>URL artikel asli</span>
+        <span>Original article URL</span>
         ${originalUrl}
       </div>
       <details class="metadata-details" open>
-        <summary>Metadata Crossref lengkap</summary>
+        <summary>Complete Crossref metadata</summary>
         <dl class="metadata-grid">${rows}</dl>
-        ${metadataListBlock("Penulis", article.authors)}
+        ${metadataListBlock("Author", article.authors)}
         ${metadataListBlock("Editor", article.editors)}
-        ${metadataListBlock("Subjek", article.subject)}
+        ${metadataListBlock("Subject", article.subject)}
         ${metadataListBlock("Funder", article.funders)}
-        ${metadataUrlListBlock("Lisensi", article.licenses)}
+        ${metadataUrlListBlock("License", article.licenses)}
         ${metadataUrlListBlock("Full-text/TDM links", article.full_text_links)}
-        ${metadataListBlock("Relasi", article.relations)}
+        ${metadataListBlock("Relation", article.relations)}
         ${abstractBlock}
         <details class="raw-metadata">
-          <summary>JSON metadata lengkap dari Crossref</summary>
+          <summary>Full JSON metadata from Crossref</summary>
           <pre>${escapeHtml(JSON.stringify(article.raw_metadata, null, 2))}</pre>
         </details>
       </details>
@@ -1019,7 +1019,7 @@ function licenseLinks(licenses) {
     note: [
       license["content-version"],
       license["delay-in-days"] !== undefined
-        ? `delay ${license["delay-in-days"]} hari`
+        ? `delay ${license["delay-in-days"]} days`
         : "",
       crossrefDate(license.start),
     ].filter(Boolean).join(" - "),
@@ -1160,7 +1160,7 @@ function wait(ms) {
 }
 
 function cleanError(error) {
-  const message = String((error && error.message) || error || "Terjadi kesalahan.");
+  const message = String((error && error.message) || error || "An error occurred.");
   return message
     .replace(/^PythonError:\s*/, "")
     .replace(/Traceback[\s\S]*?XmlRepairError:\s*/m, "")
@@ -1183,7 +1183,7 @@ function readFileAsText(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(String(reader.result || ""));
-    reader.onerror = () => reject(reader.error || new Error("File tidak dapat dibaca."));
+    reader.onerror = () => reject(reader.error || new Error("File could not be read."));
     reader.readAsText(file);
   });
 }

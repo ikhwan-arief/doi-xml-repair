@@ -1,156 +1,210 @@
 <!doctype html>
 <!--
   DOI XML Repair
-  Hak cipta (c) 2026 Ikhwan Arief (ikhwan[at]unand.ac.id).
-  Aplikasi ini dapat digunakan oleh publik berdasarkan lisensi Creative
-  Commons Attribution-NonCommercial (CC BY-NC) untuk tujuan nonkomersial
-  dengan atribusi yang jelas kepada pembuat.
+  Copyright (c) 2026 Ikhwan Arief (ikhwan[at]unand.ac.id).
+  This application is made available to the public under the Creative
+  Commons Attribution-NonCommercial (CC BY-NC) license for non-commercial
+  purposes with clear attribution to the author.
 -->
-<html lang="id">
+<html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>DOI XML Repair</title>
+    <title>DOI XML Repair — Crossref Metadata Utility</title>
+    <meta name="description" content="A static Crossref XML utility application to repair and lock existing article DOIs onto new metadata, with automatic Crossref update timestamping." />
     <link rel="stylesheet" href="assets/styles.css" />
   </head>
   <body>
+    <!-- Sticky Top Navigation Bar -->
+    <nav class="app-nav">
+      <a href="#" class="brand">
+        <span class="brand-icon">X</span>
+        <span>XML Repair Tool</span>
+      </a>
+      <div class="nav-actions">
+        <button class="button secondary" id="navResetButton" type="button" onclick="document.getElementById('resetButton').click()">
+          <i data-lucide="rotate-ccw"></i>
+          Reset Workspace
+        </button>
+      </div>
+    </nav>
+
+    <!-- App Header (Hero) -->
     <header class="app-header">
       <div>
         <p class="eyebrow">Crossref XML Utility</p>
         <h1>DOI XML Repair</h1>
         <p class="lead">
-          Metadata mengikuti XML baru. DOI artikel tetap persis dari XML lama,
-          termasuk prefix dan suffix. Timestamp output dinaikkan untuk update
-          Crossref.
+          Metadata follows the new XML file. <mark class="highlight-run">Article DOIs remain exactly</mark> from the old XML,
+          including prefixes and suffixes. Output timestamp is incremented for the Crossref update.
         </p>
       </div>
     </header>
 
+    <!-- Workspace -->
     <main class="workspace">
+      <!-- Section 1: Upload XML Panels -->
       <section class="upload-grid" aria-label="Upload XML">
         <div class="upload-panel">
+          <!-- Handwritten note overlay for Step 1 -->
+          <div class="handwritten-note" id="note-upload-old">
+            <span>Upload XML or enter old DOIs</span>
+            <svg viewBox="0 0 24 24"><path d="M17 3c2 2 4 3 6 3m-6-3c-2 2-3 4-3 6m9-9L11 15" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+
           <div class="panel-heading">
             <span class="step">1</span>
             <div>
-              <h2>Data Lama</h2>
-              <p>Sumber DOI artikel yang akan dikunci.</p>
+              <h2>Old Data</h2>
+              <p>Source of article DOIs to be locked.</p>
             </div>
           </div>
-          <div class="mode-toggle" role="radiogroup" aria-label="Mode data lama">
+          
+          <div class="mode-toggle" role="radiogroup" aria-label="Old data mode">
             <label>
               <input type="radio" name="oldInputMode" value="xml" checked />
-              Upload XML lama
+              Upload old XML
             </label>
             <label>
               <input type="radio" name="oldInputMode" value="doi" />
-              Tulis DOI lama
+              Enter old DOIs
             </label>
           </div>
+          
           <label class="file-drop" for="oldXmlInput">
             <i data-lucide="file-up"></i>
-            <span id="oldFileName">Pilih file XML lama</span>
+            <span id="oldFileName">Select old XML file</span>
             <input id="oldXmlInput" type="file" accept=".xml,text/xml,application/xml" disabled />
           </label>
+          
           <div class="doi-input-panel" id="oldDoiPanel" hidden>
-            <label for="oldDoiInput">DOI lama yang sudah terdaftar di Crossref</label>
+            <label for="oldDoiInput">Old DOIs registered at Crossref</label>
             <textarea
               id="oldDoiInput"
               spellcheck="false"
-              placeholder="10.xxxx/artikel-1&#10;10.xxxx/artikel-2"
+              placeholder="10.xxxx/article-1&#10;10.xxxx/article-2"
               disabled
             ></textarea>
             <button class="button secondary" id="lookupDoiButton" type="button" disabled>
               <i data-lucide="search"></i>
-              Ambil Metadata Lengkap Crossref
+              Fetch Full Crossref Metadata
             </button>
             <p class="field-help">
-              Tulis satu DOI per baris. Aplikasi menampilkan metadata lengkap
-              dari Crossref, termasuk URL artikel asli jika tersedia, untuk
-              membantu pencocokan.
+              Enter one DOI per line. The app retrieves full metadata
+              from Crossref, including the original article URL if available,
+              to assist in matching.
             </p>
           </div>
-          <div id="oldSummary" class="summary muted">Belum ada file.</div>
+          
+          <div id="oldSummary" class="summary muted">No file selected.</div>
         </div>
 
         <div class="upload-panel">
+          <!-- Handwritten note overlay for Step 2 -->
+          <div class="handwritten-note" id="note-upload-new">
+            <span>Provide new metadata</span>
+            <svg viewBox="0 0 24 24"><path d="M7 3c-2 2-4 3-6 3m6-3c2 2 3 4 3 6m-9-9l12 12" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+
           <div class="panel-heading">
             <span class="step">2</span>
             <div>
-              <h2>XML Baru</h2>
-              <p>Sumber metadata baru untuk output.</p>
+              <h2>New XML</h2>
+              <p>Source of new metadata for the output.</p>
             </div>
           </div>
+          
           <label class="file-drop" for="newXmlInput">
             <i data-lucide="file-up"></i>
-            <span id="newFileName">Pilih file XML baru</span>
+            <span id="newFileName">Select new XML file</span>
             <input id="newXmlInput" type="file" accept=".xml,text/xml,application/xml" disabled />
           </label>
-          <div class="mode-toggle resource-toggle" role="radiogroup" aria-label="Sumber URL artikel output">
+          
+          <div class="mode-toggle resource-toggle" role="radiogroup" aria-label="Output article URL source">
             <label>
               <input type="radio" name="newResourceMode" value="xml" checked />
-              Pakai URL dari XML baru
+              Use URL from new XML
             </label>
             <label>
               <input type="radio" name="newResourceMode" value="manual" />
-              Tulis URL baru
+              Enter new URLs
             </label>
           </div>
+          
           <div class="doi-input-panel url-input-panel" id="newUrlPanel" hidden>
-            <label for="newUrlInput">URL website baru artikel</label>
+            <label for="newUrlInput">New article website URLs</label>
             <textarea
               id="newUrlInput"
               spellcheck="false"
-              placeholder="https://jurnal.example.org/article-1&#10;https://jurnal.example.org/article-2"
+              placeholder="https://journal.example.org/article-1&#10;https://journal.example.org/article-2"
               disabled
             ></textarea>
             <p class="field-help">
-              Tulis satu URL per artikel sesuai urutan XML baru. Pada mode ini,
-              URL manual dipakai sebagai
-              <code>journal_article/doi_data/resource</code> pada output.
+              Enter one URL per article in the order of the new XML. In this mode,
+              manual URLs are used as
+              <code>journal_article/doi_data/resource</code> in the output.
             </p>
           </div>
-          <div id="newSummary" class="summary muted">Belum ada file.</div>
+          
+          <div id="newSummary" class="summary muted">No file selected.</div>
         </div>
       </section>
 
-      <section class="mapping-section" aria-label="Pemetaan DOI">
+      <!-- Section 2: Mapping Section -->
+      <section class="mapping-section" aria-label="DOI Mapping">
+        <!-- Handwritten note overlay for mapping -->
+        <div class="handwritten-note" id="note-mapping">
+          <span>Verify article matching here!</span>
+          <svg viewBox="0 0 24 24"><path d="M19 15V5c0-1.1-.9-2-2-2H7c-1.1 0-2 .9-2 2v10" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+
         <div class="section-title">
           <div>
-            <p class="eyebrow">Pemetaan DOI</p>
-            <h2>Artikel baru memakai DOI lama</h2>
+            <p class="eyebrow">DOI Mapping</p>
+            <h2>New articles mapped to old DOIs</h2>
           </div>
           <button class="button secondary" id="resetButton" type="button">
             <i data-lucide="rotate-ccw"></i>
             Reset
           </button>
         </div>
+        
         <div id="mappingStatus" class="notice">
-          Lengkapi data lama dan upload XML baru untuk membuat XML akhir.
+          Complete old data and upload new XML to generate the final XML.
         </div>
+        
         <div class="table-wrap">
           <table id="mappingTable" class="mapping-table" hidden>
             <thead>
               <tr>
-                <th>Artikel baru</th>
-                <th>DOI lama yang dipertahankan</th>
+                <th>New Article</th>
+                <th>Old DOI to Retain</th>
               </tr>
             </thead>
             <tbody id="mappingBody"></tbody>
           </table>
         </div>
+        
         <div class="action-row">
           <button class="button primary" id="generateButton" type="button" disabled>
             <i data-lucide="wand-sparkles"></i>
-            Generate Ulang
+            Regenerate
           </button>
         </div>
       </section>
 
+      <!-- Section 3: Output Section -->
       <section class="output-section" aria-label="Output XML">
+        <!-- Handwritten note overlay for output -->
+        <div class="handwritten-note" id="note-output">
+          <span>Copy or download!</span>
+          <svg viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+
         <div class="section-title">
           <div>
             <p class="eyebrow">Output</p>
-            <h2>XML hasil perbaikan</h2>
+            <h2>Repaired XML Output</h2>
           </div>
           <div class="save-actions">
             <button class="button secondary" id="copyButton" type="button" disabled>
@@ -163,25 +217,29 @@
             </button>
           </div>
         </div>
+        
         <div id="outputInfo" class="notice">
-          Output akan dibuat otomatis setelah data lama dan XML baru siap.
+          Output will be generated automatically once old data and new XML are ready.
         </div>
+        
         <div id="outputResourceSummary" class="output-resource-summary" hidden></div>
         <textarea id="xmlOutput" spellcheck="false" readonly></textarea>
       </section>
     </main>
 
+    <!-- Footer -->
     <footer class="site-footer">
       <p>
-        Hak cipta (c) 2026 Ikhwan Arief (ikhwan[at]unand.ac.id). Aplikasi ini
-        dibuat oleh Ikhwan Arief dan dapat digunakan oleh publik berdasarkan
-        lisensi Creative Commons Attribution-NonCommercial (CC BY-NC).
-        Penggunaan, adaptasi, dan distribusi diperkenankan untuk tujuan
-        nonkomersial dengan atribusi yang jelas kepada pembuat. Penggunaan
-        komersial memerlukan izin tertulis dari pemegang hak cipta.
+        Copyright (c) 2026 Ikhwan Arief (ikhwan[at]unand.ac.id). This application
+        was created by Ikhwan Arief and is made available to the public under the
+        Creative Commons Attribution-NonCommercial (CC BY-NC) license.
+        Usage, adaptation, and distribution are permitted for non-commercial
+        purposes with clear attribution to the author. Commercial use requires
+        written permission from the copyright holder.
       </p>
     </footer>
 
+    <!-- Pyodide, Lucide, and App scripts -->
     <script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"></script>
     <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
     <script src="assets/app.js"></script>
